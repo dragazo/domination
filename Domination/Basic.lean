@@ -33,21 +33,11 @@ theorem at_least_union {k : Nat} {S T : Set V} :
 
 theorem at_least_union_ph {k : Nat} {S T : Set V} :
   at_least (2 * k + 1) (S ∪ T) → at_least (k + 1) S ∨ at_least (k + 1) T :=
-  fun h ↦ let ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.le_or_le k₁ k).elim _ _
-
--- theorem at_least_symdiff {k : Nat} {S T : Set V} :
---   at_least k (S ∆ T) → ∃ k₁ k₂, k = k₁ + k₂ ∧ at_least k₁ (S \ T) ∧ at_least k₂ (T \ S) :=
---   k.recOn
---   (fun _ _ _ ↦ ⟨0, 0, rfl, trivial, trivial⟩)
---   (fun _ ih _ _ ⟨x, h, g⟩ ↦ h.elim
---     (fun _ ↦ _)
---     -- (fun _ ↦ let ⟨k₁, k₂, _⟩ := ih _ _; _)
---     (fun _ ↦ _))
---   S T
-
--- theorem at_least_ph {k : Nat} {S T : Set V} :
---   at_least (2 * k + 1) (S ∆ T) → at_least k S ∨ at_least k T := by
-
+  fun h ↦ let ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.lt_or_ge k₁ (k + 1)).elim
+    (fun _ ↦ (Nat.lt_or_ge k₂ (k + 1)).elim
+      (fun _ ↦ by omega)
+      (fun y ↦ Or.inr (at_least_le y r)))
+    (fun x ↦ Or.inl (at_least_le x q))
 
 ----------------------------------------------------------------------------------------------------
 
