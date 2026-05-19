@@ -19,10 +19,8 @@ theorem at_least_subset {k : Nat} {S T : Set V} : S ⊆ T → at_least k S → a
   (fun _ ih _ _ s ⟨_, a, b⟩ ↦ ⟨_, s a, ih _ _ (Set.diff_subset_diff_left s) b⟩)
   S T
 
-theorem at_least_add {k d : Nat} {S : Set V} : at_least (k + d) S → at_least k S :=
-  d.recOn
-  (fun h ↦ h)
-  (fun _ ih h ↦ ih ((Nat.add_succ _ _ ▸ h).elim (fun _ ⟨_, g⟩ ↦ at_least_subset Set.diff_subset g)))
+theorem at_least_le {k₁ k₂ : Nat} {S : Set V} : k₁ ≤ k₂ → at_least k₂ S → at_least k₁ S :=
+  Nat.leRec (fun h ↦ h) (fun _ _ ih ⟨_, _, p⟩ ↦ ih (at_least_subset Set.diff_subset p))
 
 theorem at_least_union {k : Nat} {S T : Set V} :
   at_least k (S ∪ T) → ∃ k₁ k₂, k = k₁ + k₂ ∧ at_least k₁ S ∧ at_least k₂ T :=
@@ -32,6 +30,10 @@ theorem at_least_union {k : Nat} {S T : Set V} :
     (fun l ↦ ⟨k₁ + 1, k₂, by omega, ⟨x, l, b⟩, at_least_subset Set.diff_subset c⟩)
     (fun r ↦ ⟨k₁, k₂ + 1, by omega, at_least_subset Set.diff_subset b, ⟨x, r, c⟩⟩))
   S T
+
+theorem at_least_union_ph {k : Nat} {S T : Set V} :
+  at_least (2 * k + 1) (S ∪ T) → at_least (k + 1) S ∨ at_least (k + 1) T :=
+  fun h ↦ let ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.le_or_le k₁ k).elim _ _
 
 -- theorem at_least_symdiff {k : Nat} {S T : Set V} :
 --   at_least k (S ∆ T) → ∃ k₁ k₂, k = k₁ + k₂ ∧ at_least k₁ (S \ T) ∧ at_least k₂ (T \ S) :=
