@@ -1,4 +1,4 @@
-# formal
+# domination
 
 ## GitHub configuration
 
