@@ -26,14 +26,14 @@ theorem at_least_union {k : Nat} {S T : Set V} :
   at_least k (S ∪ T) → ∃ k₁ k₂, k = k₁ + k₂ ∧ at_least k₁ S ∧ at_least k₂ T :=
   k.recOn
   (fun _ _ _ ↦ ⟨0, 0, rfl, trivial, trivial⟩)
-  (fun _ ih _ _ ⟨x, p, h⟩ ↦ let ⟨k₁, k₂, a, b, c⟩ := ih _ _ (Set.union_diff_distrib ▸ h); p.elim
+  (fun _ ih _ _ ⟨x, p, h⟩ ↦ have ⟨k₁, k₂, a, b, c⟩ := ih _ _ (Set.union_diff_distrib ▸ h); p.elim
     (fun l ↦ ⟨k₁ + 1, k₂, by omega, ⟨x, l, b⟩, at_least_subset Set.diff_subset c⟩)
     (fun r ↦ ⟨k₁, k₂ + 1, by omega, at_least_subset Set.diff_subset b, ⟨x, r, c⟩⟩))
   S T
 
 theorem at_least_union_ph {k : Nat} {S T : Set V} :
   at_least (2 * k + 1) (S ∪ T) → at_least (k + 1) S ∨ at_least (k + 1) T :=
-  fun h ↦ let ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.lt_or_ge k₁ (k + 1)).elim
+  fun h ↦ have ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.lt_or_ge k₁ (k + 1)).elim
     (fun _ ↦ (Nat.lt_or_ge k₂ (k + 1)).elim
       (fun _ ↦ by omega)
       (fun y ↦ Or.inr (at_least_le y r)))
@@ -74,44 +74,57 @@ def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 
-theorem ball_zero (v : V) : (ball G 0 v) = {v} := by simp [ball]
-
 -- theorem reachable_of_dist_ne_zero (u v : V) (h : G.dist u v ≠ 0) : G.Reachable u v := by
 --   contrapose h; exact SimpleGraph.dist_eq_zero_of_not_reachable h
 
-#check SimpleGraph.reachable_of_edist_ne_top
+lemma enat_le_squeeze {a : ENat} {b : Nat} (h1 : a ≤ ↑(b + 1)) (h2 : ¬ a ≤ ↑b) : a = ↑(b + 1) := by
+  cases a with
+  | top => contradiction
+  | coe a => simp only [Nat.cast_le, ENat.coe_inj] at *; omega
+
+#check SimpleGraph.edist_eq_one_iff_adj
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
-  ext x; constructor <;> simp? [ball] <;> intro h
-  · sorry
-  · match h with
-    | Or.inl h => exact le_trans h le_self_add
-    | Or.inr h =>
-      obtain ⟨i, h₁, h₂⟩ := h
-      sorry
+  ext x; constructor <;> simp [ball] <;> intro h
+  · cases Decidable.em (G.edist x v ≤ ↑r) with
+    | inl p => exact Or.inl p
+    | inr p =>
+      have d := enat_le_squeeze h p; clear h p
+      have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_eq_coe (SimpleGraph.edist_comm ▸ d)
+      cases W_vx with
+      | nil => contradiction
+      | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
+        rw [SimpleGraph.Walk.length_cons, Nat.add_right_cancel_iff] at L_vx
+        rw [SimpleGraph.edist_comm, ←L_vx]
+        exact SimpleGraph.edist_le W_wx⟩
+  · cases h with
+    | inl h => exact le_trans h le_self_add
+    | inr h =>
+      have ⟨i, A_vi, D_xi⟩ := h; clear h
+      apply le_trans (b := G.edist x i + G.edist i v) SimpleGraph.edist_triangle
+      apply add_le_add D_xi
+      rw [SimpleGraph.edist_comm, SimpleGraph.edist_eq_one_iff_adj.mpr A_vi]
 
 theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
   induction r generalizing v with
   | zero => simp [ball]
   | succ r ih =>
     rw [ball_succ]
-    apply Set.Finite.biUnion
-    · exact Set.finite_insert.mpr (Set.toFinite N(G, v))
-    · exact fun i h ↦ ih i
-
+    exact Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite N(G, v))) (fun i h ↦ ih i)
 
 def slow_growth_at (v : V) := Filter.Tendsto
-  (fun r ↦ ((ball G (r + 1) v).ncard : Real) / ((ball G r v).ncard : Real)) Filter.atTop (nhds 1)
+  (fun r ↦ ((ball G (r + 1) v).encard : ENNReal) / ((ball G r v).encard : ENNReal))
+  Filter.atTop (nhds 1)
 
 
 
 theorem slow_growth_adj [G.LocallyFinite] (u v : V) : u ∈ N(G, v) → slow_growth_at G v → slow_growth_at G u := by
   intro adj h
-  have g : ∀ r, |B(G, r + 1, v)| ≤ |B(G, r + 2, u)| :=
-    fun r ↦ Set.ncard_le_ncard (fun w ↦ _) _
+  have g : ∀ r, B(G, r + 1, v).encard ≤ B(G, r + 2, u).encard :=
+    -- fun r ↦ Set.ncard_le_ncard (fun w ↦ _) _
 
 
 
 
 
 noncomputable def density_at (S : Set V) (v : V) :=
-  Filter.limsup (fun r ↦ (|B(G, r, v) ∩ S| : Real) / (|B(G, r, v)| : Real))
+  Filter.limsup (fun r ↦ ((B(G, r, v) ∩ S).encard : ENNReal) / (B(G, r, v).encard : ENNReal))
