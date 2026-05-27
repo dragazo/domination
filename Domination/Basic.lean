@@ -72,46 +72,32 @@ def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3
 
 ----------------------------------------------------------------------------------------------------
 
-def ball (r : Nat) (v : V) : Set V := { u | G.dist u v ≤ r }
+def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 
-theorem ball_zero (c : G.Preconnected) (v : V) : (ball G 0 v) = {v} := by
-  ext x; constructor <;> rw [ball, Set.mem_setOf_eq, nonpos_iff_eq_zero] <;> intro h
-  · match SimpleGraph.dist_eq_zero_iff_eq_or_not_reachable.mp h with
-    | Or.inl h => exact Set.mem_singleton_of_eq h
-    | Or.inr h => exact False.elim (h (c x v))
-  · rw [Set.eq_of_mem_singleton h]; exact SimpleGraph.dist_self
+theorem ball_zero (v : V) : (ball G 0 v) = {v} := by simp [ball]
 
-theorem reachable_of_dist_ne_zero (u v : V) (h : G.dist u v ≠ 0) : G.Reachable u v := by
-  contrapose h; exact SimpleGraph.dist_eq_zero_of_not_reachable h
+-- theorem reachable_of_dist_ne_zero (u v : V) (h : G.dist u v ≠ 0) : G.Reachable u v := by
+--   contrapose h; exact SimpleGraph.dist_eq_zero_of_not_reachable h
 
-#check SimpleGraph.dist
+#check SimpleGraph.reachable_of_edist_ne_top
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
-  ext x; constructor <;> intro h
-  · simp only [ball, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] at *
-    by_cases d : G.dist x v ≤ r
-    · exact ⟨v, Set.mem_insert _ _, d⟩
-    · let p : G.dist x v = r + 1 := by omega
-      let ⟨w⟩ := reachable_of_dist_ne_zero G x v (by omega)
+  ext x; constructor <;> simp? [ball] <;> intro h
+  · sorry
+  · match h with
+    | Or.inl h => exact le_trans h le_self_add
+    | Or.inr h =>
+      obtain ⟨i, h₁, h₂⟩ := h
       sorry
-  · simp [ball] at *
-    match h with
-    | Or.inl h => exact Nat.le_add_right_of_le h
-    | Or.inr h => obtain ⟨z, z₁, z₂⟩ := h;
 
-  -- · by_cases d : G.dist x v = 0
-  --   · match SimpleGraph.dist_eq_zero_iff_eq_or_not_reachable.mp d with
-  --     | Or.inl t => rw [t]; simp [ball]
-
-
-
-
-
-theorem ball_finite [G.LocallyFinite] (c : G.Preconnected) (v : V) (r : Nat) : Set.Finite (ball G r v) := by
+theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
   induction r generalizing v with
-  | zero => rw [ball_zero G c]; exact Set.finite_singleton v
+  | zero => simp [ball]
   | succ r ih =>
+    rw [ball_succ]
+    apply Set.Finite.biUnion
+    · exact Set.finite_insert.mpr (Set.toFinite N(G, v))
+    · exact fun i h ↦ ih i
 
-  _
 
 def slow_growth_at (v : V) := Filter.Tendsto
   (fun r ↦ ((ball G (r + 1) v).ncard : Real) / ((ball G r v).ncard : Real)) Filter.atTop (nhds 1)
