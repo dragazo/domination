@@ -1,4 +1,4 @@
-import Mathlib.Combinatorics.SimpleGraph.Basic
+import Mathlib
 
 notation "N(" G ", " v ")" => SimpleGraph.neighborSet G v
 notation "N[" G ", " v "]" => insert v N(G, v)
@@ -11,7 +11,7 @@ variable {V : Type u} (G : SimpleGraph V)
 
 def at_least (k : Nat) (S : Set V) := match k with
   | 0 => True
-  | k' + 1 => ∃ (x : V), S x ∧ at_least k' (S \ {x})
+  | k' + 1 => ∃ x, x ∈ S ∧ at_least k' (S \ {x})
 
 theorem at_least_subset {k : Nat} {S T : Set V} : S ⊆ T → at_least k S → at_least k T :=
   k.recOn
@@ -41,21 +41,19 @@ theorem at_least_union_ph {k : Nat} {S T : Set V} :
 
 ----------------------------------------------------------------------------------------------------
 
+def pointwise (P : V → Prop) := ∀ v, P v
+def pairwise (P : V → V → Prop) := ∀ u v, u ≠ v → P u v
+
+----------------------------------------------------------------------------------------------------
+
 def open_dom (k : Nat) (S : Set V) (v : V) := at_least k (N(G, v) ∩ S)
 def closed_dom (k : Nat) (S : Set V) (v : V) := at_least k (N[G, v] ∩ S)
-
-def open_doms (k : Nat) (S : Set V) := ∀ v, open_dom G k S v
-def closed_doms (k : Nat) (S : Set V) := ∀ v, closed_dom G k S v
 
 ----------------------------------------------------------------------------------------------------
 
 def open_dist (k : Nat) (S : Set V) (u v : V) := at_least k ((N(G, u) ∆ N(G, v)) ∩ S)
 def closed_dist (k : Nat) (S : Set V) (u v : V) := at_least k ((N[G, u] ∆ N[G, v]) ∩ S)
 def self_dist (k : Nat) (S : Set V) (u v : V) := at_least k (((N(G, u) ∆ N(G, v)) ∪ {u, v}) ∩ S)
-
-def open_dists (k : Nat) (S : Set V) := ∀ u v, u ≠ v → open_dist G k S u v
-def closed_dists (k : Nat) (S : Set V) := ∀ u v, u ≠ v → closed_dist G k S u v
-def self_dists (k : Nat) (S : Set V) := ∀ u v, u ≠ v → self_dist G k S u v
 
 ----------------------------------------------------------------------------------------------------
 
@@ -64,13 +62,70 @@ def sharp_open_dist (k : Nat) (S : Set V) (u v : V) :=
 def sharp_closed_dist (k : Nat) (S : Set V) (u v : V) :=
   at_least k ((N[G, u] \ N[G, v]) ∩ S) ∨ at_least k ((N[G, v] \ N[G, u]) ∩ S)
 
-def sharp_open_dists (k : Nat) (S : Set V) := ∀ u v, u ≠ v → sharp_open_dist G k S u v
-def sharp_closed_dists (k : Nat) (S : Set V) := ∀ u v, u ≠ v → sharp_closed_dist G k S u v
+----------------------------------------------------------------------------------------------------
+
+def odom (S : Set V) := pointwise (open_dom G 1 S)
+def old (S : Set V) := pointwise (open_dom G 1 S) ∧ pairwise (open_dist G 1 S)
+def redold (S : Set V) := pointwise (open_dom G 2 S) ∧ pairwise (open_dist G 2 S)
+def detold (S : Set V) := pointwise (open_dom G 2 S) ∧ pairwise (sharp_open_dist G 2 S)
+def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3 S)
 
 ----------------------------------------------------------------------------------------------------
 
-def odom (S : Set V) := open_doms G 1 S
-def old (S : Set V) := open_doms G 1 S ∧ open_dists G 1 S
-def redold (S : Set V) := open_doms G 2 S ∧ open_dists G 2 S
-def detold (S : Set V) := open_doms G 2 S ∧ sharp_open_dists G 2 S
-def errold (S : Set V) := open_doms G 3 S ∧ open_dists G 3 S
+def ball (r : Nat) (v : V) : Set V := { u | G.dist u v ≤ r }
+
+theorem ball_zero (c : G.Preconnected) (v : V) : (ball G 0 v) = {v} := by
+  ext x; constructor <;> rw [ball, Set.mem_setOf_eq, nonpos_iff_eq_zero] <;> intro h
+  · match SimpleGraph.dist_eq_zero_iff_eq_or_not_reachable.mp h with
+    | Or.inl h => exact Set.mem_singleton_of_eq h
+    | Or.inr h => exact False.elim (h (c x v))
+  · rw [Set.eq_of_mem_singleton h]; exact SimpleGraph.dist_self
+
+theorem reachable_of_dist_ne_zero (u v : V) (h : G.dist u v ≠ 0) : G.Reachable u v := by
+  contrapose h; exact SimpleGraph.dist_eq_zero_of_not_reachable h
+
+#check SimpleGraph.dist
+theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
+  ext x; constructor <;> intro h
+  · simp only [ball, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] at *
+    by_cases d : G.dist x v ≤ r
+    · exact ⟨v, Set.mem_insert _ _, d⟩
+    · let p : G.dist x v = r + 1 := by omega
+      let ⟨w⟩ := reachable_of_dist_ne_zero G x v (by omega)
+      sorry
+  · simp [ball] at *
+    match h with
+    | Or.inl h => exact Nat.le_add_right_of_le h
+    | Or.inr h => obtain ⟨z, z₁, z₂⟩ := h;
+
+  -- · by_cases d : G.dist x v = 0
+  --   · match SimpleGraph.dist_eq_zero_iff_eq_or_not_reachable.mp d with
+  --     | Or.inl t => rw [t]; simp [ball]
+
+
+
+
+
+theorem ball_finite [G.LocallyFinite] (c : G.Preconnected) (v : V) (r : Nat) : Set.Finite (ball G r v) := by
+  induction r generalizing v with
+  | zero => rw [ball_zero G c]; exact Set.finite_singleton v
+  | succ r ih =>
+
+  _
+
+def slow_growth_at (v : V) := Filter.Tendsto
+  (fun r ↦ ((ball G (r + 1) v).ncard : Real) / ((ball G r v).ncard : Real)) Filter.atTop (nhds 1)
+
+
+
+theorem slow_growth_adj [G.LocallyFinite] (u v : V) : u ∈ N(G, v) → slow_growth_at G v → slow_growth_at G u := by
+  intro adj h
+  have g : ∀ r, |B(G, r + 1, v)| ≤ |B(G, r + 2, u)| :=
+    fun r ↦ Set.ncard_le_ncard (fun w ↦ _) _
+
+
+
+
+
+noncomputable def density_at (S : Set V) (v : V) :=
+  Filter.limsup (fun r ↦ (|B(G, r, v) ∩ S| : Real) / (|B(G, r, v)| : Real))
