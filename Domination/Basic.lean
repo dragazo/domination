@@ -77,9 +77,8 @@ def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 lemma enat_le_squeeze {a : ENat} {b : Nat} (h1 : a ≤ ↑(b + 1)) (h2 : ¬ a ≤ ↑b) : a = ↑(b + 1) := by
   cases a with
   | top => contradiction
-  | coe a => simp only [Nat.cast_le, ENat.coe_inj] at *; omega
+  | coe a => rw [Nat.cast_le, ENat.coe_inj] at *; omega
 
-#check add_le_add
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
   ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
