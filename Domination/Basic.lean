@@ -77,18 +77,17 @@ def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
   ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
-  · have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_ne_top
-      (ne_top_of_le_ne_top (fun _ ↦ by contradiction) (SimpleGraph.edist_comm ▸ h))
+  · rw [SimpleGraph.edist_comm] at h; have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_ne_top
+      (ne_top_of_le_ne_top (fun _ ↦ by contradiction) h)
     cases W_vx with
     | nil => simp
     | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
-        rw [SimpleGraph.Walk.length_cons, SimpleGraph.edist_comm] at L_vx
+        rw [SimpleGraph.Walk.length_cons] at L_vx
         rw [←L_vx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
-        exact le_trans (b := ↑W_wx.length) (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
-  · rw [Nat.cast_add]; cases h with
-    | inl h => exact le_trans h le_self_add
-    | inr h =>
-      have ⟨i, A_vi, D_xi⟩ := h; clear h
+        exact le_trans (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
+  · rw [Nat.cast_add]; match h with
+    | Or.inl h => exact le_trans h le_self_add
+    | Or.inr ⟨i, A_vi, D_xi⟩ =>
       apply le_trans (b := G.edist x i + G.edist i v) SimpleGraph.edist_triangle
       apply add_le_add D_xi
       rw [SimpleGraph.edist_comm, SimpleGraph.edist_eq_one_iff_adj.mpr A_vi, Nat.cast_one]
