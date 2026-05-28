@@ -74,17 +74,15 @@ def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 
--- theorem reachable_of_dist_ne_zero (u v : V) (h : G.dist u v ≠ 0) : G.Reachable u v := by
---   contrapose h; exact SimpleGraph.dist_eq_zero_of_not_reachable h
-
 lemma enat_le_squeeze {a : ENat} {b : Nat} (h1 : a ≤ ↑(b + 1)) (h2 : ¬ a ≤ ↑b) : a = ↑(b + 1) := by
   cases a with
   | top => contradiction
   | coe a => simp only [Nat.cast_le, ENat.coe_inj] at *; omega
 
-#check SimpleGraph.edist_eq_one_iff_adj
+#check add_le_add
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
-  ext x; constructor <;> simp [ball] <;> intro h
+  ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
+    Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
   · cases Decidable.em (G.edist x v ≤ ↑r) with
     | inl p => exact Or.inl p
     | inr p =>
@@ -96,13 +94,13 @@ theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ba
         rw [SimpleGraph.Walk.length_cons, Nat.add_right_cancel_iff] at L_vx
         rw [SimpleGraph.edist_comm, ←L_vx]
         exact SimpleGraph.edist_le W_wx⟩
-  · cases h with
+  · rw [Nat.cast_add]; cases h with
     | inl h => exact le_trans h le_self_add
     | inr h =>
       have ⟨i, A_vi, D_xi⟩ := h; clear h
       apply le_trans (b := G.edist x i + G.edist i v) SimpleGraph.edist_triangle
       apply add_le_add D_xi
-      rw [SimpleGraph.edist_comm, SimpleGraph.edist_eq_one_iff_adj.mpr A_vi]
+      rw [SimpleGraph.edist_comm, SimpleGraph.edist_eq_one_iff_adj.mpr A_vi, Nat.cast_one]
 
 theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
   induction r generalizing v with
