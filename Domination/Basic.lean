@@ -74,25 +74,17 @@ def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 
-lemma enat_le_squeeze {a : ENat} {b : Nat} (h1 : a ≤ ↑(b + 1)) (h2 : ¬ a ≤ ↑b) : a = ↑(b + 1) := by
-  cases a with
-  | top => contradiction
-  | coe a => rw [Nat.cast_le, ENat.coe_inj] at *; omega
-
 theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
   ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
-  · cases Decidable.em (G.edist x v ≤ ↑r) with
-    | inl p => exact Or.inl p
-    | inr p =>
-      have d := enat_le_squeeze h p; clear h p
-      have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_eq_coe (SimpleGraph.edist_comm ▸ d)
-      cases W_vx with
-      | nil => contradiction
-      | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
-        rw [SimpleGraph.Walk.length_cons, Nat.add_right_cancel_iff] at L_vx
-        rw [SimpleGraph.edist_comm, ←L_vx]
-        exact SimpleGraph.edist_le W_wx⟩
+  · have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_ne_top
+      (ne_top_of_le_ne_top (fun _ ↦ by contradiction) (SimpleGraph.edist_comm ▸ h))
+    cases W_vx with
+    | nil => simp
+    | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
+        rw [SimpleGraph.Walk.length_cons, SimpleGraph.edist_comm] at L_vx
+        rw [←L_vx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
+        exact le_trans (b := ↑W_wx.length) (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
   · rw [Nat.cast_add]; cases h with
     | inl h => exact le_trans h le_self_add
     | inr h =>
