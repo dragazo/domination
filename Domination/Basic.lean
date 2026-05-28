@@ -100,7 +100,7 @@ theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v
 
 theorem ball_nonempty (v : V) (r : Nat) : Set.Nonempty (ball G r v) := ⟨v, by simp [ball]⟩
 
-theorem ball_encard_div_self [G.LocallyFinite] (v : V) (r : Nat) :
+@[simp] theorem ball_encard_div_self [G.LocallyFinite] (v : V) (r : Nat) :
   ↑(ball G r v).encard / ↑(ball G r v).encard = (1 : ENNReal) := by
   apply ENNReal.div_self
   · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v r)
@@ -110,16 +110,33 @@ def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto
   (fun r ↦ ((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal))
   Filter.atTop (nhds 1)
 
-#check ENNReal.div_self
-theorem slow_growth_at_ext (v : V) : slow_growth_at G v 1 → ∀ e, slow_growth_at G v e := by
+theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
+  slow_growth_at G v → ∀ e, slow_growth_at G v e := by
   intro h e; induction e with
-  | zero =>
-    rw [slow_growth_at]
-    have s : ∀ r, ↑(ball G (r + 0) v).encard / ↑(ball G r v).encard = (1 : ENNReal) := by
-      intro r; apply ENNReal.div_self
-
-
-  | succ e ih => sorry
+  | zero => simp_rw [slow_growth_at, add_zero]; exact
+    Filter.Tendsto.congr (f₁ := fun r ↦ 1) (by simp) (by simp)
+  | succ e ih =>
+    rw [slow_growth_at] at ⊢ ih h
+    apply Filter.Tendsto.congr (f₁ := fun r ↦
+      (((ball G (r + (e + 1)) v).encard : ENNReal) / ((ball G (r + e) v).encard : ENNReal)) *
+      (((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal)))
+    · intro r; rw [div_eq_mul_inv, div_eq_mul_inv]; have shuffle :
+        ((ball G (r + (e + 1)) v).encard : ENNReal) * (↑(ball G (r + e) v).encard)⁻¹ *
+        (↑(ball G (r + e) v).encard * (↑(ball G r v).encard)⁻¹) =
+        ↑(ball G (r + (e + 1)) v).encard * (↑(ball G r v).encard)⁻¹ *
+        (↑(ball G (r + e) v).encard)⁻¹ * (↑(ball G (r + e) v).encard) := by ring
+      rw [shuffle]
+      apply ENNReal.div_mul_cancel
+      · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v (r + e))
+      · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v (r + e))
+    · nth_rw 2 [←mul_one 1]
+      apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih)
+        (ma := fun r ↦ ((ball G (r + (e + 1)) v).encard : ENNReal) / ↑(ball G (r + e) v).encard)
+        (mb := fun r ↦ ((ball G (r + e) v).encard : ENNReal) / ↑(ball G r v).encard)
+      simp_rw [show ∀ r, r + (e + 1) = (r + e) + 1 by intro; ring]
+      rw [Filter.tendsto_add_atTop_iff_nat e
+        (f := fun r ↦ ((ball G (r + 1) v).encard : ENNReal) / ↑(ball G r v).encard)]
+      exact h
 
 #check Filter.tendsto_add_atTop_iff_nat
 theorem slow_growth_near [G.LocallyFinite] (u v : V) :
