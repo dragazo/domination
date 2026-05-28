@@ -95,24 +95,51 @@ theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ba
 theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
   induction r generalizing v with
   | zero => simp [ball]
-  | succ r ih =>
-    rw [ball_succ]
-    exact Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite N(G, v))) (fun i h ↦ ih i)
+  | succ r ih => rw [ball_succ]; exact
+    Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite N(G, v))) (fun i h ↦ ih i)
 
-def slow_growth_at (v : V) := Filter.Tendsto
-  (fun r ↦ ((ball G (r + 1) v).encard : ENNReal) / ((ball G r v).encard : ENNReal))
+theorem ball_nonempty (v : V) (r : Nat) : Set.Nonempty (ball G r v) := ⟨v, by simp [ball]⟩
+
+theorem ball_encard_div_self [G.LocallyFinite] (v : V) (r : Nat) :
+  ↑(ball G r v).encard / ↑(ball G r v).encard = (1 : ENNReal) := by
+  apply ENNReal.div_self
+  · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v r)
+  · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v r)
+
+def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto
+  (fun r ↦ ((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal))
   Filter.atTop (nhds 1)
 
+#check ENNReal.div_self
+theorem slow_growth_at_ext (v : V) : slow_growth_at G v 1 → ∀ e, slow_growth_at G v e := by
+  intro h e; induction e with
+  | zero =>
+    rw [slow_growth_at]
+    have s : ∀ r, ↑(ball G (r + 0) v).encard / ↑(ball G r v).encard = (1 : ENNReal) := by
+      intro r; apply ENNReal.div_self
 
 
-theorem slow_growth_adj [G.LocallyFinite] (u v : V) : u ∈ N(G, v) → slow_growth_at G v → slow_growth_at G u := by
-  intro adj h
-  have g : ∀ r, B(G, r + 1, v).encard ≤ B(G, r + 2, u).encard :=
-    -- fun r ↦ Set.ncard_le_ncard (fun w ↦ _) _
+  | succ e ih => sorry
+
+#check Filter.tendsto_add_atTop_iff_nat
+theorem slow_growth_near [G.LocallyFinite] (u v : V) :
+  G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
+  intro ⟨W_vu⟩
+  induction W_vu with
+  | nil => tauto
+  | @cons v w u A_vw W_wu ih => exact fun h ↦ ih (by
+      unfold slow_growth_at
+      rw [← Filter.tendsto_add_atTop_iff_nat 2]
+    )
 
 
 
+theorem slow_growth [G.LocallyFinite] (c : G.Preconnected) (v : V) :
+  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_near _ _ _ (c _ _) h
 
+class SlowGrowth where
+  conn : G.Connected
+  slow : ∀ v, slow_growth_at G v
 
 noncomputable def density_at (S : Set V) (v : V) :=
   Filter.limsup (fun r ↦ ((B(G, r, v) ∩ S).encard : ENNReal) / (B(G, r, v).encard : ENNReal))
