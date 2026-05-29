@@ -105,6 +105,9 @@ theorem ball_nonempty (v : V) (r : Nat) : Set.Nonempty (ball G r v) := ⟨v, by 
   apply ENNReal.div_self
   · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v r)
   · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v r)
+@[simp] theorem ball_encard_mul_inv_self [G.LocallyFinite] (v : V) (r : Nat) :
+  ↑(ball G r v).encard * (↑(ball G r v).encard)⁻¹ = (1 : ENNReal) := by
+  rw [←div_eq_mul_inv, ball_encard_div_self]
 
 def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto
   (fun r ↦ ((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal))
@@ -122,10 +125,8 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
       (((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal)))
     · intro r
       rw [div_eq_mul_inv, div_eq_mul_inv]
-      rw [show ∀ a b c, (a * b⁻¹) * (b * c⁻¹) = a * c⁻¹ * b⁻¹ * b by intros; ring]
-      apply ENNReal.div_mul_cancel
-      · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v (r + e))
-      · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v (r + e))
+      rw [show ∀ a b c, (a * b⁻¹) * (b * c⁻¹) = a * c⁻¹ * (b * b⁻¹) by intros; ring]
+      simp [←div_eq_mul_inv]
     · nth_rw 2 [←mul_one 1]
       apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih)
         (ma := fun r ↦ ((ball G (r + (e + 1)) v).encard : ENNReal) / ↑(ball G (r + e) v).encard)
@@ -144,6 +145,7 @@ theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
   | @cons v w u A_vw W_wu ih => exact fun h ↦ ih (by
       unfold slow_growth_at
       rw [← Filter.tendsto_add_atTop_iff_nat 2]
+
     )
 
 
