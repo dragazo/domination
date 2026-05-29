@@ -123,7 +123,7 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
       arg 1; ext r
       rw [←mul_one ((ball G r v).encard : ENNReal)⁻¹, ←ball_encard_mul_inv_self G v (r + e)]
       rw [show ∀ a b c, a * (b⁻¹ * (c * c⁻¹)) = (a * c⁻¹) * (c * b⁻¹) by intros; ring]
-    conv => rhs; arg 1; rw [←mul_one 1]
+    conv => arg 3; rw [←mul_one 1]
     apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih)
       (ma := fun r ↦ (ball G (r + (e + 1)) v).encard * (↑(ball G (r + e) v).encard)⁻¹)
       (mb := fun r ↦ (ball G (r + e) v).encard * (↑(ball G r v).encard)⁻¹)
