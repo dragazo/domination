@@ -120,12 +120,9 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
     apply Filter.Tendsto.congr (f₁ := fun r ↦
       (((ball G (r + (e + 1)) v).encard : ENNReal) / ((ball G (r + e) v).encard : ENNReal)) *
       (((ball G (r + e) v).encard : ENNReal) / ((ball G r v).encard : ENNReal)))
-    · intro r; rw [div_eq_mul_inv, div_eq_mul_inv]; have shuffle :
-        ((ball G (r + (e + 1)) v).encard : ENNReal) * (↑(ball G (r + e) v).encard)⁻¹ *
-        (↑(ball G (r + e) v).encard * (↑(ball G r v).encard)⁻¹) =
-        ↑(ball G (r + (e + 1)) v).encard * (↑(ball G r v).encard)⁻¹ *
-        (↑(ball G (r + e) v).encard)⁻¹ * (↑(ball G (r + e) v).encard) := by ring
-      rw [shuffle]
+    · intro r
+      rw [div_eq_mul_inv, div_eq_mul_inv]
+      rw [show ∀ a b c, (a * b⁻¹) * (b * c⁻¹) = a * c⁻¹ * b⁻¹ * b by intros; ring]
       apply ENNReal.div_mul_cancel
       · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v (r + e))
       · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v (r + e))
@@ -139,7 +136,7 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
       exact h
 
 #check Filter.tendsto_add_atTop_iff_nat
-theorem slow_growth_near [G.LocallyFinite] (u v : V) :
+theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
   G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
   intro ⟨W_vu⟩
   induction W_vu with
@@ -152,7 +149,7 @@ theorem slow_growth_near [G.LocallyFinite] (u v : V) :
 
 
 theorem slow_growth [G.LocallyFinite] (c : G.Preconnected) (v : V) :
-  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_near _ _ _ (c _ _) h
+  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
 
 class SlowGrowth where
   conn : G.Connected
