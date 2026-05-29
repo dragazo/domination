@@ -118,22 +118,20 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) :
   intro h e; induction e with
   | zero => simp [slow_growth_at]
   | succ e ih =>
-    rw [slow_growth_at] at ⊢ ih h
-    apply Filter.Tendsto.congr (β := ENNReal) (f₁ := fun r ↦
-      ((ball G (r + (e + 1)) v).encard / (ball G (r + e) v).encard) *
-      ((ball G (r + e) v).encard / (ball G r v).encard))
-    · intro r
-      rw [div_eq_mul_inv, div_eq_mul_inv]
-      rw [show ∀ a b c, (a * b⁻¹) * (b * c⁻¹) = a * c⁻¹ * (b * b⁻¹) by intros; ring]
-      simp [←div_eq_mul_inv]
-    · nth_rw 2 [←mul_one 1]
-      apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih)
-        (ma := fun r ↦ (ball G (r + (e + 1)) v).encard  / (ball G (r + e) v).encard)
-        (mb := fun r ↦ (ball G (r + e) v).encard / (ball G r v).encard)
-      simp_rw [show ∀ r, r + (e + 1) = (r + e) + 1 by intro; ring]
-      rw [Filter.tendsto_add_atTop_iff_nat e (α := ENNReal)
-        (f := fun r ↦ (ball G (r + 1) v).encard / (ball G r v).encard)]
-      exact h
+    simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ ih h
+    conv =>
+      arg 1; ext r
+      rw [←mul_one ((ball G r v).encard : ENNReal)⁻¹]
+      rw [←ball_encard_mul_inv_self G v (r + e)]
+      rw [show ∀ a b c, a * (b⁻¹ * (c * c⁻¹)) = (a * c⁻¹) * (c * b⁻¹) by intros; ring]
+    conv => rhs; arg 1; rw [←mul_one 1]
+    apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih)
+      (ma := fun r ↦ (ball G (r + (e + 1)) v).encard * (↑(ball G (r + e) v).encard)⁻¹)
+      (mb := fun r ↦ (ball G (r + e) v).encard * (↑(ball G r v).encard)⁻¹)
+    simp_rw [show ∀ r, r + (e + 1) = (r + e) + 1 by intro; ring]
+    rw [Filter.tendsto_add_atTop_iff_nat e (α := ENNReal)
+      (f := fun r ↦ (ball G (r + 1) v).encard * (↑(ball G r v).encard)⁻¹)]
+    exact h
 
 #check Filter.tendsto_add_atTop_iff_nat
 theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
