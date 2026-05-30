@@ -117,7 +117,7 @@ def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto (β := ENNReal)
   (fun r ↦ (ball G (r + e) v).encard  / (ball G r v).encard)
   Filter.atTop (nhds 1)
 
-theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) :
+theorem slow_growth_at_ext_succ [G.LocallyFinite] (v : V) (e : Nat) :
   slow_growth_at G v ↔ slow_growth_at G v (e + 1) := by
   simp_rw [slow_growth_at, div_eq_mul_inv]
   induction e with
@@ -147,45 +147,36 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) :
         apply mul_le_mul _ (by simp) (by simp) (by simp)
         rw [show ∀ r e, r + (e + 1 + 1) = r + 1 + (e + 1) by intros; ring]
         simp [Set.encard_le_encard]
+theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) (he : e ≠ 0) :
+  slow_growth_at G v ↔ slow_growth_at G v e := match e with
+  | Nat.zero => by contradiction
+  | Nat.succ e => slow_growth_at_ext_succ G v e
 
-
-
-
-
-
-
-
-
-
-
-
-
-#check tendsto_of_tendsto_of_tendsto_of_le_of_le
-#check slow_growth_at_ext
 theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
   G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
-  have helper : ∀ v u r, G.Adj v u →
-    ((ball G (r + 2) v).encard : ENNReal) * (↑(ball G (r + 1) v).encard)⁻¹ ≤
-    (ball G (r + 3) u).encard * (↑(ball G r u).encard)⁻¹ := by
-    intro v u r Avu; rw [←div_eq_mul_inv, ←div_eq_mul_inv]
+  have helper : ∀ v u r₁ r₂, G.Adj v u →
+    ((ball G r₁ v).encard : ENNReal) * (↑(ball G (r₂ + 1) v).encard)⁻¹ ≤
+    (ball G (r₁ + 1) u).encard * (↑(ball G r₂ u).encard)⁻¹ := by
+    intro v u r₁ r₂ Avu; rw [←div_eq_mul_inv, ←div_eq_mul_inv]
     apply ENNReal.div_le_div <;> norm_cast <;> apply Set.encard_le_encard
-    · rw [ball_succ G u (r + 2)]; exact Set.subset_biUnion_of_mem (Or.inr Avu.symm)
-    · rw [ball_succ G v r]; exact Set.subset_biUnion_of_mem (Or.inr Avu)
+    · rw [ball_succ G u r₁]; exact Set.subset_biUnion_of_mem (Or.inr Avu.symm)
+    · rw [ball_succ G v r₂]; exact Set.subset_biUnion_of_mem (Or.inr Avu)
   intro ⟨W_vu⟩
   induction W_vu with
   | nil => tauto
-  | @cons v w u A_vw W_wu ih => exact fun h₁ ↦ ih (by
-      have h₅ := slow_growth_at_ext G v h₁ 5
-      simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ h₁ h₅
-
-
-      -- apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-        -- (g := fun r ↦ (ball G
-
-
-    )
-
-
+  | @cons v w u A_vw W_wu ih =>
+    intro h₃; apply ih
+    have h₅ := (slow_growth_at_ext G v 5 (by decide)).mp h₃
+    rw [slow_growth_at_ext G w 3 (by decide)]
+    simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ h₃ h₅
+    rw [←Filter.tendsto_add_atTop_iff_nat 2] at h₃
+    rw [←Filter.tendsto_add_atTop_iff_nat 1 (α := ENNReal)
+      (f := fun r ↦ ↑(ball G (r + 3) w).encard * (↑(ball G r w).encard)⁻¹)]
+    apply tendsto_of_tendsto_of_tendsto_of_le_of_le (α := ENNReal)
+      (g := fun r ↦ (ball G (r + 3) v).encard * (↑(ball G (r + 2) v).encard)⁻¹) (hg := by exact h₃)
+      (h := fun r ↦ (ball G (r + 5) v).encard * (↑(ball G r v).encard)⁻¹) (hh := by exact h₅)
+    · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw
+    · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw.symm
 
 theorem slow_growth [G.LocallyFinite] (c : G.Preconnected) (v : V) :
   slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
