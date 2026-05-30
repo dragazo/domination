@@ -141,7 +141,7 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) :
         (h := fun r ↦ (ball G (r + (e + 1 + 1)) v).encard * (↑(ball G r v).encard)⁻¹)
       · rw [Pi.le_def]; intro r
         rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard) (by norm_cast; simp) (by simp)]
-        conv => rhs; rw [mul_assoc]; rhs; rw [mul_comm]; simp
+        conv => rhs; rw [mul_assoc]; rhs; simp [mul_comm]
         simp [Set.encard_le_encard]
       · rw [Pi.le_def]; intro r
         apply mul_le_mul _ (by simp) (by simp) (by simp)
