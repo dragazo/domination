@@ -95,22 +95,20 @@ theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ba
 @[simp] theorem ball_subset (v : V) (r e : Nat) : ball G r v ⊆ ball G (r + e) v := by
   induction e with
   | zero => simp
-  | succ e ih => apply subset_trans ih; rw [←add_assoc, ball_succ]; exact
-    Set.subset_biUnion_of_mem (Or.inl rfl)
+  | succ e ih => apply subset_trans ih; simp [←add_assoc, ball_succ]
 
-theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
+@[simp] theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
   induction r generalizing v with
   | zero => simp [ball]
   | succ r ih => rw [ball_succ]; exact
-    Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite N(G, v))) (fun i h ↦ ih i)
+    Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite _)) (fun i h ↦ ih i)
 
-theorem ball_nonempty (v : V) (r : Nat) : Set.Nonempty (ball G r v) := ⟨v, by simp [ball]⟩
+@[simp] theorem ball_nonempty' (v : V) (r : Nat) : ball G r v ≠ ∅ := by
+  intro h; rw [Set.eq_empty_iff_forall_notMem] at h; apply h v; simp [ball]
 
 @[simp] theorem ball_encard_div_self [G.LocallyFinite] (v : V) (r : Nat) :
-  (ball G r v).encard / (ball G r v).encard = (1 : ENNReal) := by
-  apply ENNReal.div_self
-  · norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v r)
-  · norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v r)
+  (ball G r v).encard / (ball G r v).encard = (1 : ENNReal) :=
+  ENNReal.div_self (by norm_cast; simp) (by simp)
 @[simp] theorem ball_encard_mul_inv_self [G.LocallyFinite] (v : V) (r : Nat) :
   (ball G r v).encard * (↑(ball G r v).encard)⁻¹ = (1 : ENNReal) := by
   rw [←div_eq_mul_inv, ball_encard_div_self]
@@ -142,15 +140,25 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) :
         (g := fun r ↦ 1) (hg := by simp) (hh := by exact h)
         (h := fun r ↦ (ball G (r + (e + 1 + 1)) v).encard * (↑(ball G r v).encard)⁻¹)
       · rw [Pi.le_def]; intro r
-        rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard)
-          (by norm_cast; exact Set.encard_ne_zero.mpr (ball_nonempty G v r))
-          (by norm_cast; exact Set.encard_ne_top_iff.mpr (ball_finite G v r))]
+        rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard) (by norm_cast; simp) (by simp)]
         conv => rhs; rw [mul_assoc]; rhs; rw [mul_comm]; simp
         rw [one_mul, mul_one]; norm_cast; exact Set.encard_le_encard (by simp)
       · rw [Pi.le_def]; intro r
         apply mul_le_mul _ (by simp) (by simp) (by simp)
         rw [show ∀ r e, r + (e + 1 + 1) = r + 1 + (e + 1) by intros; ring]
-        norm_cast; exact Set.encard_le_encard (by simp)
+        norm_cast; simp [Set.encard_le_encard]
+
+
+
+
+
+
+
+
+
+
+
+
 
 #check tendsto_of_tendsto_of_tendsto_of_le_of_le
 #check slow_growth_at_ext
