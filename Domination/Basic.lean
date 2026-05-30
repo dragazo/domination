@@ -170,11 +170,8 @@ theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
     rw [slow_growth_at_ext G w 3 (by decide)]
     simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ h₃ h₅
     rw [←Filter.tendsto_add_atTop_iff_nat 2] at h₃
-    rw [←Filter.tendsto_add_atTop_iff_nat 1 (α := ENNReal)
-      (f := fun r ↦ ↑(ball G (r + 3) w).encard * (↑(ball G r w).encard)⁻¹)]
-    apply tendsto_of_tendsto_of_tendsto_of_le_of_le (α := ENNReal)
-      (g := fun r ↦ (ball G (r + 3) v).encard * (↑(ball G (r + 2) v).encard)⁻¹) (hg := by exact h₃)
-      (h := fun r ↦ (ball G (r + 5) v).encard * (↑(ball G r v).encard)⁻¹) (hh := by exact h₅)
+    rw [←Filter.tendsto_add_atTop_iff_nat 1]
+    apply tendsto_of_tendsto_of_tendsto_of_le_of_le (hg := by exact h₃) (hh := by exact h₅)
     · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw
     · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw.symm
 
