@@ -103,7 +103,7 @@ theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ba
   | succ r ih => rw [ball_succ]; exact
     Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite _)) (fun i h ↦ ih i)
 
-@[simp] theorem ball_nonempty' (v : V) (r : Nat) : ball G r v ≠ ∅ := by
+@[simp] theorem ball_nonempty (v : V) (r : Nat) : ball G r v ≠ ∅ := by
   intro h; rw [Set.eq_empty_iff_forall_notMem] at h; apply h v; simp [ball]
 
 @[simp] theorem ball_encard_div_self [G.LocallyFinite] (v : V) (r : Nat) :
@@ -111,7 +111,7 @@ theorem ball_succ (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ba
   ENNReal.div_self (by norm_cast; simp) (by simp)
 @[simp] theorem ball_encard_mul_inv_self [G.LocallyFinite] (v : V) (r : Nat) :
   (ball G r v).encard * (↑(ball G r v).encard)⁻¹ = (1 : ENNReal) := by
-  rw [←div_eq_mul_inv, ball_encard_div_self]
+  simp [←div_eq_mul_inv]
 
 def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto (β := ENNReal)
   (fun r ↦ (ball G (r + e) v).encard  / (ball G r v).encard)
@@ -142,11 +142,11 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e : Nat) :
       · rw [Pi.le_def]; intro r
         rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard) (by norm_cast; simp) (by simp)]
         conv => rhs; rw [mul_assoc]; rhs; rw [mul_comm]; simp
-        rw [one_mul, mul_one]; norm_cast; exact Set.encard_le_encard (by simp)
+        simp [Set.encard_le_encard]
       · rw [Pi.le_def]; intro r
         apply mul_le_mul _ (by simp) (by simp) (by simp)
         rw [show ∀ r e, r + (e + 1 + 1) = r + 1 + (e + 1) by intros; ring]
-        norm_cast; simp [Set.encard_le_encard]
+        simp [Set.encard_le_encard]
 
 
 
