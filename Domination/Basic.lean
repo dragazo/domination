@@ -129,16 +129,12 @@ theorem slow_growth_at_ext_succ [G.LocallyFinite] (v : V) (e : Nat) :
         rw [←mul_one ((ball G r v).encard : ENNReal)⁻¹, ←ball_encard_mul_inv_self G v (r + (e + 1))]
         rw [show ∀ a b c, a * (b⁻¹ * (c * c⁻¹)) = (a * c⁻¹) * (c * b⁻¹) by intros; ring]
       conv => arg 3; rw [←mul_one 1]
-      apply ENNReal.Tendsto.mul (ha := by simp) (hb := by simp) (hmb := by exact ih.mp h)
-        (ma := fun r ↦ (ball G (r + (e + 1 + 1)) v).encard * (↑(ball G (r + (e + 1)) v).encard)⁻¹)
-        (mb := fun r ↦ (ball G (r + (e + 1)) v).encard * (↑(ball G r v).encard)⁻¹)
+      apply ENNReal.Tendsto.mul _ (by simp) (ih.mp h) (by simp)
       simp_rw [show ∀ r, r + (e + 1 + 1) = (r + (e + 1)) + 1 by intro; ring]
       rw [Filter.tendsto_add_atTop_iff_nat (e + 1) (α := ENNReal)
         (f := fun r ↦ (ball G (r + 1) v).encard * (↑(ball G r v).encard)⁻¹)]
       exact h
-    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (α := ENNReal)
-        (g := fun r ↦ 1) (hg := by simp) (hh := by exact h)
-        (h := fun r ↦ (ball G (r + (e + 1 + 1)) v).encard * (↑(ball G r v).encard)⁻¹)
+    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h
       · rw [Pi.le_def]; intro r
         rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard) (by norm_cast; simp) (by simp)]
         conv => rhs; rw [mul_assoc]; rhs; simp [mul_comm]
@@ -171,11 +167,11 @@ theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
     simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ h₃ h₅
     rw [←Filter.tendsto_add_atTop_iff_nat 2] at h₃
     rw [←Filter.tendsto_add_atTop_iff_nat 1]
-    apply tendsto_of_tendsto_of_tendsto_of_le_of_le (hg := by exact h₃) (hh := by exact h₅)
+    apply tendsto_of_tendsto_of_tendsto_of_le_of_le h₃ h₅
     · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw
     · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw.symm
 
-theorem slow_growth [G.LocallyFinite] (c : G.Preconnected) (v : V) :
+theorem slow_growth_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
   slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
 
 class SlowGrowth where
