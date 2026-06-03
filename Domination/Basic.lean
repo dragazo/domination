@@ -100,7 +100,8 @@ theorem ball_eq_ball_sphere (v : V) (r : Nat) :
   | top => exact ⟨fun h ↦ by contradiction, fun h ↦ h.elim (by simp) (fun h ↦ by contradiction)⟩
   | coe d => norm_cast; exact Nat.le_succ_iff
 
-theorem ball_sphere_disjoint (v : V) (r : Nat) : Disjoint (ball G r v) (sphere G (r + 1) v) := by
+@[simp] theorem ball_sphere_disjoint (v : V) (r : Nat) :
+  Disjoint (ball G r v) (sphere G (r + 1) v) := by
   intro s; simp only [Set.le_eq_subset, Set.bot_eq_empty, Set.subset_empty_iff]; intro a b
   rw [Set.eq_empty_iff_forall_notMem]; intro x h
   have g := h; apply a at h; apply b at g; simp only [ball, sphere, Set.mem_setOf_eq] at h g
@@ -128,6 +129,14 @@ theorem ball_sphere_disjoint (v : V) (r : Nat) : Disjoint (ball G r v) (sphere G
   (ball G r v).encard / (ball G r v).encard = (1 : ENNReal) := ENNReal.div_self (by simp) (by simp)
 @[simp] theorem ball_encard_mul_inv_self [G.LocallyFinite] (v : V) (r : Nat) :
   (ball G r v).encard * (↑(ball G r v).encard)⁻¹ = (1 : ENNReal) := by simp [←div_eq_mul_inv]
+
+@[simp] theorem inter_inter_disjoint_of_disjoint {α : Type u} (s t w : Set α) (h : Disjoint s t) :
+  Disjoint (s ∩ w) (t ∩ w) := by
+  intro x
+  simp only [Set.le_eq_subset, Set.subset_inter_iff, Set.bot_eq_empty, Set.subset_empty_iff]
+  rw [Set.eq_empty_iff_forall_notMem]
+  intro ⟨a, _⟩ ⟨b, _⟩ _ c
+  exact (Set.disjoint_iff_forall_ne.mp h) (a c) (b c) rfl
 
 def slow_growth_at (v : V) (e : Nat := 1) := Filter.Tendsto (α := Nat) (β := ENNReal)
   (fun r ↦ (ball G (r + e) v).encard  / (ball G r v).encard)
@@ -193,13 +202,25 @@ def udensity_at (S : Set V) (v : V) (d : ENNReal) (e : Nat := 0) :=
   Filter.limsup (β := Nat) (α := ENNReal)
   (fun r ↦ ((ball G (r + e) v) ∩ S).encard / (ball G r v).encard) Filter.atTop = d
 
-
-
-theorem udensity_at_ext (S : Set V) (v : V) (d : ENNReal) (e : Nat) (h : slow_growth_at G v) :
+theorem udensity_at_ext (S : Set V) (v : V) (d : ENNReal) (e : Nat) (s : slow_growth_at G v) :
   udensity_at G S v d ↔ udensity_at G S v d e := by
   induction e with
   | zero => tauto
   | succ e ih =>
-    unfold udensity_at at ⊢ ih; constructor <;> intro h
-    ·
+    unfold udensity_at at ⊢ ih; unfold slow_growth_at at s; constructor <;> intro h
+    · simp_rw [←add_assoc, ball_eq_ball_sphere, Set.union_inter_distrib_right]
+      conv =>
+        lhs; arg 1; ext r
+        rw [Set.encard_union_eq (by simp), ENat.toENNReal_add, ENNReal.add_div]
+      rw [←add_zero d, ←Pi.add_def, ENNReal.limsup_add_of_right_tendsto_zero]
+      · rw [add_zero]; exact ih.mp h
+      · sorry
     · sorry
+
+theorem udensity_reach [G.LocallyFinite] (S : Set V) (u v : V) (d : ENNReal) :
+  G.Reachable v u → udensity_at G S v d → udensity_at G S u d := by
+  sorry
+
+theorem udensity_all [G.LocallyFinite] (c : G.Preconnected) (S : Set V) (v : V) (d : ENNReal) :
+  udensity_at G S v d → ∀ u, udensity_at G S u d :=
+  fun h _ ↦ udensity_reach _ _ _ _ _ (c _ _) h
