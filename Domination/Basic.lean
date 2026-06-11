@@ -98,7 +98,14 @@ theorem ball_eq_ball_sphere (v : V) (r : Nat) :
   ext x; simp only [ball, sphere, Set.mem_setOf_eq, Set.mem_union]
   cases G.edist x v with
   | top => exact ⟨fun h ↦ by contradiction, fun h ↦ h.elim (by simp) (fun h ↦ by contradiction)⟩
-  | coe d => norm_cast; exact Nat.le_succ_iff
+  | coe d => norm_cast; omega
+
+theorem sphere_eq_ball_sub (v : V) (r : Nat) :
+  sphere G (r + 1) v = (ball G (r + 1) v) \ (ball G r v) := by
+  ext x; simp only [ball, sphere, Set.mem_setOf_eq, Set.mem_diff]
+  cases G.edist x v with
+  | top => exact ⟨fun h ↦ by contradiction, fun ⟨h, g⟩ ↦ by contradiction⟩
+  | coe d => norm_cast; omega
 
 @[simp] theorem ball_sphere_disjoint (v : V) (r : Nat) :
   Disjoint (ball G r v) (sphere G (r + 1) v) := by
@@ -114,7 +121,7 @@ theorem ball_eq_ball_sphere (v : V) (r : Nat) :
   | zero => simp
   | succ e ih => apply subset_trans ih; simp [←add_assoc, ball_eq_union_ball]
 
-@[simp] theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : Set.Finite (ball G r v) := by
+@[simp] theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : (ball G r v).Finite := by
   induction r generalizing v with
   | zero => simp [ball]
   | succ r ih => rw [ball_eq_union_ball]; exact
@@ -198,6 +205,31 @@ theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
 theorem slow_growth_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
   slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
 
+def slow_growth_at' (v : V) (e : Nat := 1) := Filter.Tendsto (α := Nat) (β := ENNReal)
+  (fun r ↦ (sphere G (r + e) v).encard  / (ball G r v).encard)
+  Filter.atTop (nhds 0)
+
+#check ENNReal.Tendsto.sub
+theorem slow_growth_at_iff_slow_growth_at' [G.LocallyFinite] (v : V) (e : Nat) (he : e ≠ 0) :
+  slow_growth_at G v e ↔ slow_growth_at' G v e := by
+  cases e with | zero => contradiction | succ e =>
+  rw [slow_growth_at, slow_growth_at']; constructor <;> intro h
+  · rw [←tsub_self (1 : ENNReal)]; conv =>
+      arg 1; ext r
+      rw [←add_assoc, sphere_eq_ball_sub, Set.encard_diff (by simp) (by simp)]
+      rw [ENat.toENNReal_sub, ENNReal.sub_div (by simp), add_assoc]
+    apply ENNReal.Tendsto.sub h _ (by simp)
+    rw [←slow_growth_at] at ⊢ h
+    cases e with | zero => simp [slow_growth_at] | succ e =>
+    rw [←slow_growth_at_ext G v (e + 1) (by omega), slow_growth_at_ext G v (e + 1 + 1) (by omega)]
+    exact h
+  · conv =>
+      arg 1; ext r
+      rw [←add_assoc, ball_eq_ball_sphere, Set.encard_union_eq (by simp)]
+      rw [ENat.toENNReal_add, ENNReal.add_div, add_assoc]
+
+
+
 def udensity_at (S : Set V) (v : V) (d : ENNReal) (e : Nat := 0) :=
   Filter.limsup (β := Nat) (α := ENNReal)
   (fun r ↦ ((ball G (r + e) v) ∩ S).encard / (ball G r v).encard) Filter.atTop = d
@@ -215,7 +247,8 @@ theorem udensity_at_ext (S : Set V) (v : V) (d : ENNReal) (e : Nat) (s : slow_gr
       rw [←add_zero d, ←Pi.add_def, ENNReal.limsup_add_of_right_tendsto_zero]
       · rw [add_zero]; exact ih.mp h
       · sorry
-    · sorry
+    · apply ih.mpr
+      sorry
 
 theorem udensity_reach [G.LocallyFinite] (S : Set V) (u v : V) (d : ENNReal) :
   G.Reachable v u → udensity_at G S v d → udensity_at G S u d := by
