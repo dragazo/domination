@@ -224,9 +224,11 @@ theorem slow_boundary_at_of_slow_growth_at [G.LocallyFinite] (v : V) (e : Nat) :
   rw [←slow_growth_at_ext G v (e + 1) (by omega), slow_growth_at_ext G v (e + 1 + 1) (by omega)]
   exact h
 
+#check tendsto_of_tendsto_of_tendsto_of_le_of_le
+#check Filter.tendsto_add_atTop_iff_nat
 theorem slow_growth_at_of_slow_boundary_at [G.LocallyFinite] (v : V) (e : Nat) :
-  Monotone (fun r ↦ sphere G r v) → slow_boundary_at G v e → slow_growth_at G v e := by
-  intro m; rw [slow_boundary_at, slow_growth_at]; intro h
+  slow_boundary_at G v e → slow_growth_at G v e := by
+  rw [slow_boundary_at, slow_growth_at]; intro h
   induction e with | zero => simp | succ e ih =>
   simp_rw [←add_assoc] at ⊢ h
   conv =>
@@ -235,11 +237,19 @@ theorem slow_growth_at_of_slow_boundary_at [G.LocallyFinite] (v : V) (e : Nat) :
     rw [ENat.toENNReal_add, ENNReal.add_div]
   conv => arg 3; rw [←add_zero 1]
   apply Filter.Tendsto.add _ h
-  apply ih
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-    (g := fun r ↦ 0) (by simp) h (by rw [Pi.le_def]; simp)
-  rw [Pi.le_def]; intro r; apply ENNReal.div_le_div_right
-  norm_cast; apply Set.encard_le_encard; apply m; omega
+  apply ih; clear ih
+  have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := ENNReal)
+    (g := fun r ↦ 0)
+    (f := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G (r + 1) v).encard)
+    (h := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G r v).encard)
+    (a := 0) (b := Filter.atTop) (by simp) h (by simp [Pi.le_def])
+    (by
+      rw [Pi.le_def]; intro r; apply ENNReal.div_le_div_left; norm_cast; simp [Set.encard_le_encard]
+    )
+  simp_rw [show ∀ r : Nat, r + e + 1 = r + 1 + e by intro; ring] at t
+  rw [Filter.tendsto_add_atTop_iff_nat 1 (α := ENNReal)
+    (f := fun r ↦ ↑(sphere G (r + e) v).encard / ↑(ball G r v).encard)] at t
+  exact t
 
 def udensity_at (S : Set V) (v : V) (d : ENNReal) (e : Nat := 0) :=
   Filter.limsup (β := Nat) (α := ENNReal)
