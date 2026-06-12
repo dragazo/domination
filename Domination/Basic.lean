@@ -235,12 +235,10 @@ theorem slow_boundary_at_iff_slow_growth_at [G.LocallyFinite] (v : V) (e : Nat) 
     apply Filter.Tendsto.add _ h
     apply ih; clear ih
     have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := ENNReal)
-      (g := fun r ↦ 0)
-      (f := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G (r + 1) v).encard)
-      (h := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G r v).encard)
+      (g := fun r ↦ 0) (f := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G (r + 1) v).encard)
       (a := 0) (b := Filter.atTop) (by simp) h (by simp [Pi.le_def]) (by
-        rw [Pi.le_def]; intro r
-        apply ENNReal.div_le_div_left; norm_cast; simp [Set.encard_le_encard])
+        rw [Pi.le_def]; intro r; apply ENNReal.div_le_div_left;
+        norm_cast; simp [Set.encard_le_encard])
     simp_rw [show ∀ r : Nat, r + e + 1 = r + 1 + e by intro; ring] at t
     rw [Filter.tendsto_add_atTop_iff_nat 1 (α := ENNReal)
       (f := fun r ↦ ↑(sphere G (r + e) v).encard / ↑(ball G r v).encard)] at t
