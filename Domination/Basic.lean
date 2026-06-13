@@ -149,103 +149,51 @@ def slow_growth_at [G.LocallyFinite] (v : V) (e₁ : Nat := 1) (e₂ : Nat := 0)
   (fun r ↦ ↑(Fintype.card (ball G (r + e₁) v)) / ↑(Fintype.card (ball G (r + e₂) v)))
   Filter.atTop (nhds 1)
 
-#check Filter.Tendsto.inv
-#check Filter.Tendsto.mul
-#check ContinuousAt.inv
-#check Filter.Tendsto.inv₀
--- #check (continuousAt_inv one_ne_zero).tendsto.comp
-#check tendsto_of_tendsto_of_tendsto_of_le_of_le
-theorem slow_growth_at_ext' [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat) :
+#check div_mul_div_cancel₀
+theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat) :
   e₁ ≠ e₂ → e₃ ≠ e₄ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄) := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
-    | 0, _ => fun _ ↦ by contradiction
-    | e₁ + 1, e₂ + 1 => fun _ ↦ by
-      simp_rw [←helper e₁ e₂ (by omega), slow_growth_at, add_comm e₁, add_comm e₂, ←add_assoc]
-      nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
-    | e₁ + 1, 0 => fun _ ↦ by
-      cases Decidable.em (e₁ = 0) with | inl h => simp [h] | inr _ =>
-      rw [←helper e₁ 0 (by omega)]; unfold slow_growth_at; constructor <;> intro h
-      · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h
-        · rw [Pi.le_def]; intro r; rw [one_le_div (by simp)]; simp [Set.card_le_card]
-        · rw [Pi.le_def]; intro r; rw [div_le_div_iff_of_pos_right (by simp)]
-          simp [←add_assoc, Set.card_le_card]
-      · have t : ∀ (a b c : Real), c ≠ 0 → a / b = (a / c) * (c / b) := by intros; field
-        conv => arg 1; ext r; rw [t _ _ ↑(Fintype.card (ball G (r + 1) v)) (by simp)]
-        conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
-        apply Filter.Tendsto.mul
-        · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
-        · rw [←slow_growth_at] at ⊢ h; rw [helper e₁ 0 (by omega)] at h; exact h
-  let super_helper : ∀ e₁ e₂, e₁ ≠ e₂ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v) := by
-    intro e₁ e₂ _
-    cases Decidable.em (e₂ < e₁) with
-    | inl h => exact helper e₁ e₂ h
-    | inr h => sorry
-  intro h₁ h₂
-  cases Decidable.em (e₂ < e₁) with
-  | inl h => sorry
-  | inr h => sorry
-
-      -- · apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-      --     (β := Nat) (α := Real)
-      --     (b := Filter.atTop) (a := 1)
-      --     (g := fun r ↦ 1) (by simp)
-      --     (h := fun r ↦ (Fintype.card (ball G r v)) / ↑(Fintype.card (ball G (r + e₁) v)))
-      --   · conv => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
-      --     conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
-      --     exact Filter.Tendsto.inv₀ h (by simp)
-      --   · sorry
-      --   · rw [Pi.le_def]; intro r; apply div_le_div₀ (by simp) _ (by simp)
-
-
-theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ : Nat) :
-  e₁ ≠ 0 → e₂ ≠ 0 → (slow_growth_at G v e₁ ↔ slow_growth_at G v e₂) := fun he₁ he₂ ↦ by
-  have helper : ∀ e, e ≠ 0 → (slow_growth_at G v ↔ slow_growth_at G v e) := by
-    intro e he; cases e with | zero => contradiction | succ e =>
-    clear he; simp_rw [slow_growth_at, div_eq_mul_inv]
-    induction e with | zero => simp | succ e ih =>
-    constructor <;> intro h
+  | 0, _ => fun _ ↦ by contradiction
+  | e₁ + 1, e₂ + 1 => fun _ ↦ by
+    simp_rw [←helper e₁ e₂ (by omega), slow_growth_at, add_comm e₁, add_comm e₂, ←add_assoc]
+    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
+  | e₁ + 1, 0 => fun _ ↦ by
+    cases Decidable.em (e₁ = 0) with | inl h => simp [h] | inr _ =>
+    rw [←helper e₁ 0 (by omega)]; unfold slow_growth_at; constructor <;> intro h
+    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;>
+      rw [Pi.le_def] <;> intro r
+      · rw [one_le_div (by simp)]; simp [Set.card_le_card]
+      · rw [div_le_div_iff_of_pos_right (by simp)]; simp [←add_assoc, Set.card_le_card]
     · conv =>
-        arg 1; ext r
-        rw [←mul_one ((ball G r v).encard : ENNReal)⁻¹]
-        rw [←ball_encard_mul_inv_self G v (r + (e + 1))]
-        rw [show ∀ a b c, a * (b⁻¹ * (c * c⁻¹)) = (a * c⁻¹) * (c * b⁻¹) by intros; ring]
-      conv => arg 3; rw [←mul_one 1]
-      apply ENNReal.Tendsto.mul _ (by simp) ((ih (by simp)).mp h) (by simp)
-      simp_rw [show ∀ r, r + (e + 1 + 1) = (r + (e + 1)) + 1 by intro; ring]
-      rw [Filter.tendsto_add_atTop_iff_nat (e + 1) (α := ENNReal)
-        (f := fun r ↦ (ball G (r + 1) v).encard * (↑(ball G r v).encard)⁻¹)]
-      exact h
-    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h
-      · rw [Pi.le_def]; intro r
-        rw [←ENNReal.mul_le_mul_iff_left (c := (ball G r v).encard) (by simp) (by simp)]
-        conv => rhs; rw [mul_assoc]; rhs; simp [mul_comm]
-        simp [Set.encard_le_encard]
-      · rw [Pi.le_def]; intro r
-        apply mul_le_mul _ (by simp) (by simp) (by simp)
-        rw [show ∀ r e, r + (e + 1 + 1) = r + 1 + (e + 1) by intros; ring]
-        simp [Set.encard_le_encard]
-  rw [←helper e₁ he₁, ←helper e₂ he₂]
+        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(Fintype.card (ball G (r + 1) v))) (by simp)]
+      conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
+      apply Filter.Tendsto.mul
+      · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
+      · rw [←slow_growth_at] at ⊢ h; rw [helper e₁ 0 (by omega)] at h; exact h
+  have assistant : ∀ e₁ e₂, e₁ ≠ e₂ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v) := by
+    have t : ∀ e₁ e₂, slow_growth_at G v e₁ e₂ → slow_growth_at G v e₂ e₁ := fun e₁ e₂ h ↦ by
+      rw [slow_growth_at]
+      conv => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
+      conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
+      exact Filter.Tendsto.inv₀ h (by simp)
+    intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
+    rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
+  intro h₁ h₂; rw [assistant e₁ e₂ h₁, assistant e₃ e₄ h₂]
 
 theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
   G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
-  have helper : ∀ v u r₁ r₂, G.Adj v u →
-    ((ball G r₁ v).encard : ENNReal) * (↑(ball G (r₂ + 1) v).encard)⁻¹ ≤
-    (ball G (r₁ + 1) u).encard * (↑(ball G r₂ u).encard)⁻¹ := by
-    intro v u r₁ r₂ Avu; rw [←div_eq_mul_inv, ←div_eq_mul_inv]
-    apply ENNReal.div_le_div <;> norm_cast <;> apply Set.encard_le_encard
-    · rw [ball_eq_union_ball G u r₁]; exact Set.subset_biUnion_of_mem (Or.inr Avu.symm)
-    · rw [ball_eq_union_ball G v r₂]; exact Set.subset_biUnion_of_mem (Or.inr Avu)
-  intro ⟨W_vu⟩
-  induction W_vu with | nil => tauto | @cons v w u A_vw W_wu ih =>
-  intro h₃; apply ih
-  have h₅ := (slow_growth_at_ext G v 1 5 (by decide) (by decide)).mp h₃
-  rw [slow_growth_at_ext G w 1 3 (by decide) (by decide)]
-  simp_rw [slow_growth_at, div_eq_mul_inv] at ⊢ h₃ h₅
-  rw [←Filter.tendsto_add_atTop_iff_nat 2] at h₃
-  rw [←Filter.tendsto_add_atTop_iff_nat 1]
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le h₃ h₅
-  · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw
-  · rw [Pi.le_def]; intro r; exact helper _ _ _ _ A_vw.symm
+  have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
+    (Fintype.card (ball G r₁ v) : Real) / (Fintype.card (ball G (r₂ + 1) v) : Real) ≤
+    (Fintype.card (ball G (r₁ + 1) u) : Real) / (Fintype.card (ball G r₂ u) : Real) := by
+    apply div_le_div₀ (by simp) _ (by simp) <;> norm_cast <;> apply Set.card_le_card <;>
+    rw [ball_eq_union_ball _ _ _] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
+  intro ⟨W_vu⟩; induction W_vu with | nil => tauto | @cons v w u A_vw W_wu ih =>
+  intro h₃; apply ih; clear ih
+  rw [slow_growth_at_ext G v 1 0 3 2 (by decide) (by decide)] at h₃
+  have h₅ := (slow_growth_at_ext G v 3 2 5 0 (by decide) (by decide)).mp h₃
+  rw [slow_growth_at_ext G w 1 0 4 1 (by decide) (by decide)]
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le h₃ h₅ <;>
+  rw [Pi.le_def] <;> intro _ <;> simp [helper, A_vw, A_vw.symm]
 
 theorem slow_growth_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
   slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
