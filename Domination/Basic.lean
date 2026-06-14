@@ -80,6 +80,9 @@ def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3
   intro ⟨a, _⟩ ⟨b, _⟩ _ c
   exact (Set.disjoint_iff_forall_ne.mp h) (a c) (b c) rfl
 
+@[simp] theorem ncard_div_nonneg {α : Type u} (s t : Set α) :
+  0 ≤ (s.ncard : Real) / (t.ncard : Real) := by simp [div_nonneg]
+
 ----------------------------------------------------------------------------------------------------
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
@@ -140,8 +143,8 @@ noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Finite (ball G r v)
 @[simp] theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : (ball G r v).Finite :=
   (ball G r v).toFinite
 
-noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype (sphere G r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (by simp)
+noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Finite (sphere G r v) := by
+  apply Set.Finite.to_subtype; apply Set.Finite.subset (s := ball G r v) (by simp)
   rw [ball, sphere, Set.setOf_subset_setOf]; aesop
 @[simp] theorem sphere_finite [G.LocallyFinite] (v : V) (r : Nat) : (sphere G r v).Finite :=
   (sphere G r v).toFinite
@@ -212,8 +215,6 @@ def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
-#check Set.encard_diff
-#check Set.toFinset_diff
 theorem slow_boundary_at_iff_slow_growth_at [G.LocallyFinite] (v : V) (e : Nat) :
   e ≠ 0 → (slow_growth_at G v e ↔ slow_boundary_at G v e) := fun he ↦ by
   constructor
@@ -221,32 +222,31 @@ theorem slow_boundary_at_iff_slow_growth_at [G.LocallyFinite] (v : V) (e : Nat) 
     rw [slow_growth_at, slow_boundary_at]; intro h
     conv =>
       arg 1; ext r;
-      rw [←add_assoc, sphere_eq_ball_sub, Set.encard_diff (by simp) (by simp)]
-      rw [ENat.toENNReal_sub, ENNReal.sub_div (by simp), add_assoc]
-    rw [←tsub_self (1 : ENNReal)]
-    apply ENNReal.Tendsto.sub h _ (by simp)
-    simp_rw [add_zero]; rw [←slow_growth_at] at ⊢ h
+      rw [←add_assoc, sphere_eq_ball_sub, Set.ncard_diff (by simp) (by simp)]
+      rw [Nat.cast_sub (by simp [Set.ncard_le_ncard]), sub_div, add_assoc]
+    rw [←sub_self 1]
+    apply Filter.Tendsto.sub h
+    rw [←slow_growth_at] at ⊢ h
     cases e with | zero => simp [slow_growth_at] | succ e =>
-    rw [slow_growth_at_ext G v (e + 1) (e + 1 + 1) (by omega) (by omega)]
+    rw [slow_growth_at_ext G v (e + 1) 0 (e + 1 + 1) 0 (by omega) (by omega)]
     exact h
   · clear he; rw [slow_boundary_at, slow_growth_at]; intro h
     induction e with | zero => simp | succ e ih =>
     simp_rw [←add_assoc] at ⊢ h
     conv =>
       arg 1; ext r
-      rw [ball_eq_ball_sphere, Set.encard_union_eq (by simp)]
-      rw [ENat.toENNReal_add, ENNReal.add_div]
+      rw [ball_eq_ball_sphere, Set.ncard_union_eq (by simp)]
+      rw [Nat.cast_add, add_div]
     conv => arg 3; rw [←add_zero 1]
     apply Filter.Tendsto.add _ h
     apply ih; clear ih
-    have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := ENNReal)
-      (g := fun r ↦ 0) (f := fun r ↦ ↑(sphere G (r + e + 1) v).encard / ↑(ball G (r + 1) v).encard)
-      (a := 0) (b := Filter.atTop) (by simp) h (by simp [Pi.le_def]) (by
-        rw [Pi.le_def]; intro r; apply ENNReal.div_le_div_left;
-        norm_cast; simp [Set.encard_le_encard])
+    have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := Real)
+      (g := fun r ↦ 0) (f := fun r ↦ ↑(sphere G (r + e + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
+      (a := 0) (b := Filter.atTop) (by simp) h (by simp [Pi.le_def])
+      (by simp [Pi.le_def, div_le_div_of_nonneg_left, Set.ncard_le_ncard])
     simp_rw [show ∀ r : Nat, r + e + 1 = r + 1 + e by intro; ring] at t
-    rw [Filter.tendsto_add_atTop_iff_nat 1 (α := ENNReal)
-      (f := fun r ↦ ↑(sphere G (r + e) v).encard / ↑(ball G r v).encard)] at t
+    rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
+      (f := fun r ↦ ↑(sphere G (r + e) v).ncard / ↑(ball G r v).ncard)] at t
     exact t
 
 #check Filter.tendsto_add_atTop_iff_nat
