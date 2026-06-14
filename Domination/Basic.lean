@@ -166,11 +166,11 @@ def slow_growth_at [G.LocallyFinite] (v : V) (e₁ : Nat := 1) (e₂ : Nat := 0)
 theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat) :
   e₁ ≠ e₂ → e₃ ≠ e₄ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄) := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
-  | 0, _ => fun _ ↦ by contradiction
-  | e₁ + 1, e₂ + 1 => fun _ ↦ by
+  | 0, _, _ => by contradiction
+  | e₁ + 1, e₂ + 1, _ => by
     simp_rw [←helper e₁ e₂ (by omega), slow_growth_at, add_comm e₁, add_comm e₂, ←add_assoc]
     nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
-  | e₁ + 1, 0 => fun _ ↦ by
+  | e₁ + 1, 0, _ => by
     cases Decidable.em (e₁ = 0) with | inl h => simp [h] | inr _ =>
     rw [←helper e₁ 0 (by omega)]; unfold slow_growth_at; constructor <;> intro h
     · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;>
@@ -215,39 +215,41 @@ def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
-theorem slow_boundary_at_iff_slow_growth_at [G.LocallyFinite] (v : V) (e : Nat) :
-  e ≠ 0 → (slow_growth_at G v e ↔ slow_boundary_at G v e) := fun he ↦ by
-  constructor
-  · cases e with | zero => contradiction | succ e =>
-    rw [slow_growth_at, slow_boundary_at]; intro h
-    conv =>
-      arg 1; ext r;
-      rw [←add_assoc, sphere_eq_ball_sub, Set.ncard_diff (by simp) (by simp)]
-      rw [Nat.cast_sub (by simp [Set.ncard_le_ncard]), sub_div, add_assoc]
-    rw [←sub_self 1]
-    apply Filter.Tendsto.sub h
-    rw [←slow_growth_at] at ⊢ h
-    cases e with | zero => simp [slow_growth_at] | succ e =>
-    rw [slow_growth_at_ext G v (e + 1) 0 (e + 1 + 1) 0 (by omega) (by omega)]
-    exact h
-  · clear he; rw [slow_boundary_at, slow_growth_at]; intro h
-    induction e with | zero => simp | succ e ih =>
-    simp_rw [←add_assoc] at ⊢ h
-    conv =>
-      arg 1; ext r
-      rw [ball_eq_ball_sphere, Set.ncard_union_eq (by simp)]
-      rw [Nat.cast_add, add_div]
-    conv => arg 3; rw [←add_zero 1]
-    apply Filter.Tendsto.add _ h
-    apply ih; clear ih
-    have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := Real)
-      (g := fun r ↦ 0) (f := fun r ↦ ↑(sphere G (r + e + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
-      (a := 0) (b := Filter.atTop) (by simp) h (by simp [Pi.le_def])
-      (by simp [Pi.le_def, div_le_div_of_nonneg_left, Set.ncard_le_ncard])
-    simp_rw [show ∀ r : Nat, r + e + 1 = r + 1 + e by intro; ring] at t
-    rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
-      (f := fun r ↦ ↑(sphere G (r + e) v).ncard / ↑(ball G r v).ncard)] at t
-    exact t
+theorem slow_boundary_at_iff_slow_growth_at [G.LocallyFinite] (v : V) :
+  ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_boundary_at G v e₁ e₂)
+  | 0, _, _ => by contradiction
+  | e₁ + 1, e₂ + 1, _ => by
+    have ih := slow_boundary_at_iff_slow_growth_at v e₁ e₂ (by omega)
+    simp only [slow_growth_at, slow_boundary_at, add_comm e₁, add_comm e₂, ←add_assoc] at ⊢ ih
+    nth_rw 1 [←Filter.tendsto_add_atTop_iff_nat 1] at ih
+    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1] at ih; exact ih
+  | e₁ + 1, 0, _ => by
+    constructor <;> rw [slow_growth_at, slow_boundary_at] <;> intro h
+    · conv =>
+        arg 1; ext r;
+        rw [←add_assoc, sphere_eq_ball_sub, Set.ncard_diff (by simp) (by simp)]
+        rw [Nat.cast_sub (by simp [Set.ncard_le_ncard]), sub_div, add_assoc]
+      rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
+      cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
+      rw [slow_growth_at_ext G v (e₁ + 1) 0 (e₁ + 1 + 1) 0 (by omega) (by omega)]
+      exact h
+    · conv =>
+        arg 1; ext r;
+        rw [←add_assoc, ball_eq_ball_sphere, Set.ncard_union_eq (by simp), Nat.cast_add, add_div]
+      conv => arg 3; rw [←add_zero 1]
+      apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
+      cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
+      rw [slow_boundary_at_iff_slow_growth_at v (e₁ + 1) 0 (by omega)]
+      have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := Real)
+        (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def])
+        (f := fun r ↦ ↑(sphere G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
+        (by simp [Pi.le_def, ←add_assoc, div_le_div_of_nonneg_left, Set.ncard_le_ncard])
+      simp_rw [show ∀ r : Nat, r + e₁ + 1 + 1 = r + 1 + e₁ + 1 by intro; ring] at t
+      rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
+        (f := fun r ↦ ↑(sphere G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
+      exact t
+
+#check div_le_div_of_nonneg_left
 
 #check Filter.tendsto_add_atTop_iff_nat
 #check tendsto_of_tendsto_of_tendsto_of_le_of_le
