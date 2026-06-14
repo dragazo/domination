@@ -134,8 +134,8 @@ theorem sphere_eq_ball_sub (v : V) (r : Nat) :
   | zero => simp
   | succ e ih => apply subset_trans ih; simp [←add_assoc, ball_eq_union_ball]
 
-noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Finite (ball G r v) := by
-  apply Set.Finite.to_subtype
+noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype ↑(ball G r v) := by
+  apply Set.Finite.fintype
   induction r generalizing v with
   | zero => simp [ball]
   | succ r ih => rw [ball_eq_union_ball]; exact
@@ -143,8 +143,8 @@ noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Finite (ball G r v)
 @[simp] theorem ball_finite [G.LocallyFinite] (v : V) (r : Nat) : (ball G r v).Finite :=
   (ball G r v).toFinite
 
-noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Finite (sphere G r v) := by
-  apply Set.Finite.to_subtype; apply Set.Finite.subset (s := ball G r v) (by simp)
+noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype ↑(sphere G r v) := by
+  apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (by simp)
   rw [ball, sphere, Set.setOf_subset_setOf]; aesop
 @[simp] theorem sphere_finite [G.LocallyFinite] (v : V) (r : Nat) : (sphere G r v).Finite :=
   (sphere G r v).toFinite
@@ -191,9 +191,9 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat)
       exact Filter.Tendsto.inv₀ h (by simp)
     intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
     rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
-  intro h₁ h₂; rw [assistant e₁ e₂ h₁, assistant e₃ e₄ h₂]
+  intro p q; rw [assistant _ _ p, assistant _ _ q]
 
-theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
+theorem slow_growth_at_reach [G.LocallyFinite] (u v : V) :
   G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
   have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
     ((ball G r₁ v).ncard : Real) / ((ball G (r₂ + 1) v).ncard : Real) ≤
@@ -208,8 +208,8 @@ theorem slow_growth_reach [G.LocallyFinite] (u v : V) :
   apply tendsto_of_tendsto_of_tendsto_of_le_of_le h₃ h₅ <;>
   rw [Pi.le_def] <;> intro _ <;> simp [helper, A_vw, A_vw.symm]
 
-theorem slow_growth_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
-  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_reach _ _ _ (c _ _) h
+theorem slow_growth_at_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
+  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_at_reach _ _ _ (c _ _) h
 
 def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
@@ -241,7 +241,7 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
       apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
       cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
       rw [slow_growth_at_iff_slow_boundary_at v (e₁ + 1) 0 (by omega)]
-      have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (β := Nat) (α := Real)
+      have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
         (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def])
         (f := fun r ↦ ↑(sphere G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
         (by simp [Pi.le_def, ←add_assoc, div_le_div_of_nonneg_left, Set.ncard_le_ncard])
@@ -286,11 +286,24 @@ theorem slow_boundary_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Na
     --   sorry
     -- · sorry
 
+def ufdensity_at [G.LocallyFinite] (f : V → Real) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
+  (fun r ↦ (∑ x ∈ (ball G (r + e₁) v), f x) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
+theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real) (v : V) (d : Real) (e₁ e₂ e₃ e₄ : Nat)
+  (sg : slow_growth_at G v) : ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d e₃ e₄ := by
+  sorry
 
-def udensity_at (S : Set V) (v : V) (d : ENNReal) (e : Nat := 0) :=
-  Filter.limsup (β := Nat) (α := ENNReal)
-  (fun r ↦ ((ball G (r + e) v) ∩ S).encard / (ball G r v).encard) Filter.atTop = d
+theorem ufdensity_at_reach [G.LocallyFinite] (f : V → Real) (v u : V) (d : Real) (e₁ e₂ : Nat)
+  (sg : slow_growth_at G v) (rvu : G.Reachable v u) :
+  ufdensity_at G f v d e₁ e₂ → ufdensity_at G f u d e₁ e₂ := by
+  sorry
+
+theorem ufdensity_at_all [G.LocallyFinite] (f : V → Real) (v : V) (d : Real) (e₁ e₂ : Nat)
+  (sg : slow_growth_at G v) (c : G.Preconnected) : ∀ u, ufdensity_at G f u d := by
+  sorry
+
+def udensity_at [G.LocallyFinite] (S : Set V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
+  (fun r ↦ (((ball G (r + e₁) v) ∩ S).ncard : Real) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
 theorem udensity_at_ext (S : Set V) (v : V) (d : ENNReal) (e : Nat) (s : slow_growth_at G v) :
   udensity_at G S v d ↔ udensity_at G S v d e := by
