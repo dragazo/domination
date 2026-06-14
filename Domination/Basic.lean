@@ -215,6 +215,7 @@ def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
+-- note: e₁ < e₂ is not provable in general by counterexample: tree with #children = depth
 theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
   ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_boundary_at G v e₁ e₂)
   | 0, _, _ => by contradiction
