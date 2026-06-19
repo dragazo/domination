@@ -303,9 +303,6 @@ theorem limsup_mul_eq {f g : Nat → Real}
     · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₁]
     · exists m₁; rw [Filter.eventually_map, Filter.eventually_atTop]; simp [b₁]
 
-#check Filter.limsup_nat_add
-#check div_mul_div_cancel₀
-#check slow_growth_at_ext
 theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
   (p : ∀ r, 0 ≤ f r) (b : ∀ r, f r ≤ m)
   (v : V) (d : Real) (e₁ e₂ e₃ e₄ : Nat)
@@ -326,26 +323,25 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
         rw [←div_mul_div_cancel₀ (G₀ := Real) (b := (ball G r v).ncard) (by simp)]
         rw [mul_comm]
       conv_rhs => rw [←one_mul d]
-      apply limsup_mul_eq
+      apply limsup_mul_eq (m₂ := m) (m₁ := 1)
       · conv => arg 1; ext r; rw [add_zero]; lhs; rw [←add_zero r]
         rw [←slow_growth_at]; rw [slow_growth_at_ext G v 0 1 1 0 (by decide) (by decide)]; assumption
-      · sorry
+      · conv_lhs => arg 1; ext r; rw [add_assoc, add_comm 1]; rhs; rw [←add_zero r]
+        rw [←ufdensity_at]; exact h
       · simp
       · simp [div_nonneg, Finset.sum_nonneg, p]
-      · sorry
-      · sorry
-      · sorry
+      · simp [div_le_one, Set.ncard_le_ncard]
       · sorry
     · unfold ufdensity_at;
       sorry
-  have assistant : ∀ e₁ e₂, e₁ ≠ e₂ → (ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d) := by
-     have t : ∀ e₁ e₂, ufdensity_at G f v d e₁ e₂ → ufdensity_at G f v d e₂ e₁ := fun e₁ e₂ h ↦ by
-      unfold ufdensity_at
-      conv_lhs => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
-      conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
-      exact Filter.Tendsto.inv₀ h (by simp)
-    intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
-    rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
+  -- have assistant : ∀ e₁ e₂, e₁ ≠ e₂ → (ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d) := by
+  --    have t : ∀ e₁ e₂, ufdensity_at G f v d e₁ e₂ → ufdensity_at G f v d e₂ e₁ := fun e₁ e₂ h ↦ by
+  --     unfold ufdensity_at
+  --     conv_lhs => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
+  --     conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
+  --     exact Filter.Tendsto.inv₀ h (by simp)
+  --   intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
+  --   rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
   sorry
 
 theorem ufdensity_at_reach [G.LocallyFinite] (f : V → Real) (v u : V) (d : Real) :
