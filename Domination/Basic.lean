@@ -308,9 +308,14 @@ theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
   cases Decidable.em (e₁ = e₂) with | inl h => simp [h] | inr h =>
   rw [←slow_growth_at, slow_growth_at_ext G v e₁ e₂ 1 0 h (by decide)]; exact sg
 
-#check Finset.sum_le_sum
-#check Filter.Eventually.mono
-#check mul_le_mul_of_nonneg_left
+@[simp] theorem fball_div_nonneg [G.LocallyFinite] {f : V → Real} (p : ∀ v, 0 ≤ f v)
+  : 0 ≤ (∑ x ∈ (ball G r₁ v).toFinset, f x) / ↑(ball G r₂ v).ncard := by
+  simp [div_nonneg, Finset.sum_nonneg, p]
+
+@[simp] theorem fgerg [G.LocallyFinite] (h : r₁ ≤ r₂)
+  : ((ball G r₁ v).ncard : Real) / ↑(ball G r₂ v).ncard ≤ 1 := by
+  simp [div_le_one, Set.ncard_le_ncard, h]
+
 theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
   (p : ∀ r, 0 ≤ f r) (b : ∀ r, f r ≤ m)
   (v : V) (d : Real) (e₁ e₂ e₃ e₄ : Nat) (hm : 1 ≤ m)
@@ -320,24 +325,20 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
   | e₁ + 1, e₂ + 1, _ => by
     unfold ufdensity_at; simp_rw [add_comm e₁, add_comm e₂, ←add_assoc]
     rw [Filter.limsup_nat_add 1
-      (f := fun r ↦ (∑ x ∈ (ball G (r + e₁) v).toFinset, f x) / ↑(ball G (r + e₂) v).ncard)]
+      (f := fun r ↦ (∑ x ∈ (ball G (r + e₁) v), f x) / ↑(ball G (r + e₂) v).ncard)]
     exact helper _ _ (by omega)
   | e₁ + 1, 0, _ => by
     cases Decidable.em (e₁ = 0) with | inl h => simp [h] | inr h =>
     rw [←helper e₁ 0 (by omega)]; constructor <;> intro h
     · rw [ufdensity_at, ←Filter.limsup_nat_add _ 1]
       conv_lhs =>
-        arg 1; ext r;
-        rw [←div_mul_div_cancel₀ (G₀ := Real) (b := (ball G r v).ncard) (by simp), mul_comm]
+        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ((ball G r v).ncard : ℝ)) (by simp), mul_comm]
       conv_rhs => rw [←one_mul d]
-      apply limsup_mul_eq (m₂ := 2 * m) (m₁ := 1)
+      apply limsup_mul_eq (m₂ := 2 * m) (m₁ := 1) _ _ (by simp) (by simp [p]) (by simp) _
       · conv => arg 1; ext r; rw [add_zero]; lhs; rw [←add_zero r]
         rw [←slow_growth_at, slow_growth_at_ext G v 0 1 1 0 (by decide) (by decide)]; assumption
       · conv_lhs => arg 1; ext r; rw [add_assoc, add_comm 1]; rhs; rw [←add_zero r]
         rw [←ufdensity_at]; exact h
-      · simp
-      · simp [div_nonneg, Finset.sum_nonneg, p]
-      · simp [div_le_one, Set.ncard_le_ncard]
       · apply Filter.Eventually.mono (eventually_le_of_slow_growth_at G sg (e₁ + 1) 0 1 (by simp))
         intro r q; dsimp; rw [one_add_one_eq_two] at q
         apply le_trans (b := m * (↑(ball G (r + (e₁ + 1)) v).ncard / ↑(ball G (r + 0) v).ncard))
