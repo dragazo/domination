@@ -289,23 +289,31 @@ def ufdensity_at [G.LocallyFinite] (f : V → Real) (v : V) (d : Real) (e₁ e�
 
 theorem limsup_mul_eq {f g : Nat → Real}
   (l₁ : Filter.Tendsto f Filter.atTop (nhds y₁)) (l₂ : Filter.limsup g Filter.atTop = y₂)
-  (p₁ : ∀ r, 0 ≤ f r) (p₂ : ∀ r, 0 ≤ g r) (b₁ : ∀ r, f r ≤ m₁) (b₂ : ∀ r, g r ≤ m₂) :
+  (p₁ : ∀ r, 0 ≤ f r) (p₂ : ∀ r, 0 ≤ g r)
+  (b₁ : ∀ᶠ r in Filter.atTop, (· ≤ ·) (f r) m₁) (b₂ : ∀ᶠ r in Filter.atTop, (· ≤ ·) (g r) m₂) :
   Filter.limsup (f * g) Filter.atTop = y₁ * y₂ := by
   apply le_antisymm
-  · rw [←Filter.Tendsto.limsup_eq l₁, ←l₂]; apply limsup_mul_le
+  · rw [←Filter.Tendsto.limsup_eq l₁, ←l₂]; apply limsup_mul_le _ (by exists m₁) _ (by exists m₂)
     · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₁]
-    · exists m₁; rw [Filter.eventually_map, Filter.eventually_atTop]; simp [b₁]
     · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₂]
-    · exists m₂; rw [Filter.eventually_map, Filter.eventually_atTop]; simp [b₂]
-  · rw [mul_comm y₁, ←Filter.Tendsto.liminf_eq l₁, ←l₂, mul_comm f]; apply le_limsup_mul
+  · rw [mul_comm y₁, ←Filter.Tendsto.liminf_eq l₁, ←l₂, mul_comm f]
+    apply le_limsup_mul _ (by exists m₂) _ (by exists m₁)
     · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₂]
-    · exists m₂; rw [Filter.eventually_map, Filter.eventually_atTop]; simp [b₂]
     · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₁]
-    · exists m₁; rw [Filter.eventually_map, Filter.eventually_atTop]; simp [b₁]
 
+theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
+  (sg : slow_growth_at G v) (e₁ e₂ : Nat) (ε : Real) (hε : 0 < ε) :
+  ∀ᶠ r in Filter.atTop, ((ball G (r + e₁) v).ncard : Real) / (ball G (r + e₂) v).ncard ≤ 1 + ε := by
+  apply Filter.Tendsto.eventually_le_const (v := 1) (by simp [hε])
+  cases Decidable.em (e₁ = e₂) with | inl h => simp [h] | inr h =>
+  rw [←slow_growth_at, slow_growth_at_ext G v e₁ e₂ 1 0 h (by decide)]; exact sg
+
+#check Finset.sum_le_sum
+#check Filter.Eventually.mono
+#check mul_le_mul_of_nonneg_left
 theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
   (p : ∀ r, 0 ≤ f r) (b : ∀ r, f r ≤ m)
-  (v : V) (d : Real) (e₁ e₂ e₃ e₄ : Nat)
+  (v : V) (d : Real) (e₁ e₂ e₃ e₄ : Nat) (hm : 1 ≤ m)
   (sg : slow_growth_at G v) : ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d e₃ e₄ := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d 1)
   | 0, _, _ => by contradiction
@@ -320,18 +328,23 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
     · rw [ufdensity_at, ←Filter.limsup_nat_add _ 1]
       conv_lhs =>
         arg 1; ext r;
-        rw [←div_mul_div_cancel₀ (G₀ := Real) (b := (ball G r v).ncard) (by simp)]
-        rw [mul_comm]
+        rw [←div_mul_div_cancel₀ (G₀ := Real) (b := (ball G r v).ncard) (by simp), mul_comm]
       conv_rhs => rw [←one_mul d]
-      apply limsup_mul_eq (m₂ := m) (m₁ := 1)
+      apply limsup_mul_eq (m₂ := 2 * m) (m₁ := 1)
       · conv => arg 1; ext r; rw [add_zero]; lhs; rw [←add_zero r]
-        rw [←slow_growth_at]; rw [slow_growth_at_ext G v 0 1 1 0 (by decide) (by decide)]; assumption
+        rw [←slow_growth_at, slow_growth_at_ext G v 0 1 1 0 (by decide) (by decide)]; assumption
       · conv_lhs => arg 1; ext r; rw [add_assoc, add_comm 1]; rhs; rw [←add_zero r]
         rw [←ufdensity_at]; exact h
       · simp
       · simp [div_nonneg, Finset.sum_nonneg, p]
       · simp [div_le_one, Set.ncard_le_ncard]
-      · sorry
+      · apply Filter.Eventually.mono (eventually_le_of_slow_growth_at G sg (e₁ + 1) 0 1 (by simp))
+        intro r q; dsimp; rw [one_add_one_eq_two] at q
+        apply le_trans (b := m * (↑(ball G (r + (e₁ + 1)) v).ncard / ↑(ball G (r + 0) v).ncard))
+        · rw [mul_div]; apply div_le_div_of_nonneg_right _ (by simp); rw [add_comm e₁, ←add_assoc]
+          rw [Set.ncard_eq_toFinset_card _, mul_comm m, ←nsmul_eq_mul]
+          apply Finset.sum_le_card_nsmul; simp [b]
+        · rw [mul_comm 2]; apply mul_le_mul_of_nonneg_left q (by linarith)
     · unfold ufdensity_at;
       sorry
   -- have assistant : ∀ e₁ e₂, e₁ ≠ e₂ → (ufdensity_at G f v d e₁ e₂ ↔ ufdensity_at G f v d) := by
@@ -343,6 +356,9 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
   --   intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
   --   rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
   sorry
+
+#check Finset.sum_le_card_nsmul
+#check Set.ncard_eq_toFinset_card
 
 theorem ufdensity_at_reach [G.LocallyFinite] (f : V → Real) (v u : V) (d : Real) :
   slow_growth_at G v → G.Reachable v u → ufdensity_at G f v d → ufdensity_at G f u d := by
