@@ -167,6 +167,7 @@ def slow_growth_at [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) := Filter.T
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
+-- todo: come back later and see if we can prove this without induction
 theorem slow_growth_at_ext {G : SimpleGraph V} [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
   (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega) :
   slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
@@ -195,21 +196,22 @@ theorem slow_growth_at_ext {G : SimpleGraph V} [G.LocallyFinite] {v : V} {e₁ e
     rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
   rw [assistant _ _ h₁₂, assistant _ _ h₃₄]
 
-theorem slow_growth_at_reach [G.LocallyFinite] (u v : V) :
-  G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
+theorem slow_growth_at_reach {G : SimpleGraph V} [G.LocallyFinite] {u v : V}
+  (r : G.Reachable v u) (sg : slow_growth_at G v := by assumption)
+  : slow_growth_at G u := by
   have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
     ((ball G r₁ v).ncard : Real) / ((ball G (r₂ + 1) v).ncard : Real) ≤
     ((ball G (r₁ + 1) u).ncard : Real) / ((ball G r₂ u).ncard : Real) := by
     apply div_le_div₀ (by simp) _ (by simp) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by simp)
     <;> rw [ball_eq_union_ball _ _ _] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
-  intro ⟨W_vu⟩; induction W_vu with | nil => tauto | @cons v w u Avw _ ih =>
-  intro p; apply ih; rw [slow_growth_at_ext 3 2] at p
-  have q := (slow_growth_at_ext 5 0).mp p
-  rw [slow_growth_at_ext 4 1]
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le p q <;> simp [Pi.le_def, helper, Avw, Avw.symm]
+  have ⟨Wvu⟩ := r; induction Wvu with | nil => tauto | @cons v w u Avw Wwu ih =>
+  apply ih ⟨Wwu⟩; rw [slow_growth_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+    ((slow_growth_at_ext 3 2).mp sg) ((slow_growth_at_ext 5).mp sg)
+    <;> simp [Pi.le_def, helper, Avw, Avw.symm]
 
-theorem slow_growth_at_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
-  slow_growth_at G v → ∀ u, slow_growth_at G u := fun h _ ↦ slow_growth_at_reach _ _ _ (c _ _) h
+theorem slow_growth_at_all {G : SimpleGraph V} [G.LocallyFinite] {v : V}
+  (c : G.Preconnected) (sg : slow_growth_at G v := by assumption) :
+  ∀ u, slow_growth_at G u := fun _ ↦ slow_growth_at_reach (c _ _)
 
 def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
@@ -232,7 +234,7 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
         rw [Nat.cast_sub (by simp), sub_div, add_assoc]
       rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
       cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
-      rw [slow_growth_at_ext (e₁ + 1 + 1) 0]
+      rw [slow_growth_at_ext (e₁ + 1 + 1)]
       exact h
     · conv =>
         arg 1; ext r;
@@ -330,10 +332,10 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
     conv_rhs => rw [←one_mul d]
     apply limsup_mul_eq (m₁ := 2) (m₂ := 2 * m) _ h (by simp) (by simp [p]) _ _
     · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext 1 0]; exact sg
+      rw [←slow_growth_at, slow_growth_at_ext]; exact sg
     · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
       cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext 1 0]; exact sg
+      rw [←slow_growth_at, slow_growth_at_ext]; exact sg
     · apply Filter.Eventually.mono (eventually_le_of_slow_growth_at (e₁ + e₃) (e₂ + e₃) 1)
       intro r q; dsimp; rw [one_add_one_eq_two] at q
       apply le_trans
