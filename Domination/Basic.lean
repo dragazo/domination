@@ -163,12 +163,13 @@ noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype ↑(sphere 
 @[simp] theorem ball_ncard_positive [G.LocallyFinite] (v : V) (r : Nat) : 0 < (ball G r v).ncard :=
   Nat.pos_of_ne_zero (by simp)
 
-def slow_growth_at [G.LocallyFinite] (v : V) (e₁ : Nat := 1) (e₂ : Nat := 0) := Filter.Tendsto
+def slow_growth_at [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat) :
-  e₁ ≠ e₂ → e₃ ≠ e₄ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄) := by
+theorem slow_growth_at_ext {G : SimpleGraph V} [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
+  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega) :
+  slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
   | 0, _, _ => by contradiction
   | e₁ + 1, e₂ + 1, _ => by
@@ -192,7 +193,7 @@ theorem slow_growth_at_ext [G.LocallyFinite] (v : V) (e₁ e₂ e₃ e₄ : Nat)
       exact Filter.Tendsto.inv₀ h (by simp)
     intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr h =>
     rw [←helper e₂ e₁ (by omega)]; constructor <;> exact fun h ↦ t _ _ h
-  intro p q; rw [assistant _ _ p, assistant _ _ q]
+  rw [assistant _ _ h₁₂, assistant _ _ h₃₄]
 
 theorem slow_growth_at_reach [G.LocallyFinite] (u v : V) :
   G.Reachable v u → slow_growth_at G v → slow_growth_at G u := by
@@ -202,9 +203,9 @@ theorem slow_growth_at_reach [G.LocallyFinite] (u v : V) :
     apply div_le_div₀ (by simp) _ (by simp) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by simp)
     <;> rw [ball_eq_union_ball _ _ _] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
   intro ⟨W_vu⟩; induction W_vu with | nil => tauto | @cons v w u Avw _ ih =>
-  intro p; apply ih; rw [slow_growth_at_ext G v 1 0 3 2 (by decide) (by decide)] at p
-  have q := (slow_growth_at_ext G v 3 2 5 0 (by decide) (by decide)).mp p
-  rw [slow_growth_at_ext G w 1 0 4 1 (by decide) (by decide)]
+  intro p; apply ih; rw [slow_growth_at_ext 3 2] at p
+  have q := (slow_growth_at_ext 5 0).mp p
+  rw [slow_growth_at_ext 4 1]
   apply tendsto_of_tendsto_of_tendsto_of_le_of_le p q <;> simp [Pi.le_def, helper, Avw, Avw.symm]
 
 theorem slow_growth_at_all [G.LocallyFinite] (c : G.Preconnected) (v : V) :
@@ -231,7 +232,7 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
         rw [Nat.cast_sub (by simp), sub_div, add_assoc]
       rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
       cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
-      rw [slow_growth_at_ext G v (e₁ + 1) 0 (e₁ + 1 + 1) 0 (by omega) (by omega)]
+      rw [slow_growth_at_ext (e₁ + 1 + 1) 0]
       exact h
     · conv =>
         arg 1; ext r;
@@ -301,12 +302,12 @@ theorem limsup_mul_eq {f g : Nat → Real}
     · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₂]
     · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₁]
 
-theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
-  (sg : slow_growth_at G v) (e₁ e₂ : Nat) (ε : Real) (hε : 0 < ε) :
+theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
+  (e₁ e₂ : Nat) (ε : Real) (sg : slow_growth_at G v := by assumption) (hε : 0 < ε := by simp) :
   ∀ᶠ r in Filter.atTop, ((ball G (r + e₁) v).ncard : Real) / (ball G (r + e₂) v).ncard ≤ 1 + ε := by
   apply Filter.Tendsto.eventually_le_const (v := 1) (by simp [hε])
   cases Decidable.em (e₁ = e₂) with | inl h => simp [h] | inr h =>
-  rw [←slow_growth_at, slow_growth_at_ext G v e₁ e₂ 1 0 h (by decide)]; exact sg
+  rw [←slow_growth_at, slow_growth_at_ext]; exact sg
 
 @[simp] theorem fball_div_nonneg [G.LocallyFinite] {f : V → Real} (p : ∀ v, 0 ≤ f v)
   : 0 ≤ (∑ x ∈ (ball G r₁ v).toFinset, f x) / ↑(ball G r₂ v).ncard := by
@@ -329,12 +330,11 @@ theorem ufdensity_at_ext [G.LocallyFinite] (f : V → Real)
     conv_rhs => rw [←one_mul d]
     apply limsup_mul_eq (m₁ := 2) (m₂ := 2 * m) _ h (by simp) (by simp [p]) _ _
     · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext G v (e₂ + e₃) (e₁ + e₄) 1 0 t (by decide)]; exact sg
+      rw [←slow_growth_at, slow_growth_at_ext 1 0]; exact sg
     · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
       cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext G v (e₂ + e₃) (e₁ + e₄) 1 0 t (by decide)]; exact sg
-    · apply Filter.Eventually.mono
-        (eventually_le_of_slow_growth_at G sg (e₁ + e₃) (e₂ + e₃) 1 (by simp))
+      rw [←slow_growth_at, slow_growth_at_ext 1 0]; exact sg
+    · apply Filter.Eventually.mono (eventually_le_of_slow_growth_at (e₁ + e₃) (e₂ + e₃) 1)
       intro r q; dsimp; rw [one_add_one_eq_two] at q
       apply le_trans
         (b := m * (↑(ball G (r + (e₁ + e₃)) v).ncard / ↑(ball G (r + (e₂ + e₃)) v).ncard))
