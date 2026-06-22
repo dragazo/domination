@@ -163,7 +163,7 @@ noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype ↑(sphere 
 @[simp] theorem ball_ncard_positive [G.LocallyFinite] (v : V) (r : Nat) : 0 < (ball G r v).ncard :=
   Nat.pos_of_ne_zero (by simp)
 
------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 def slow_growth_at [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
@@ -186,7 +186,7 @@ def ufdensity_at [G.LocallyFinite] (π : Policy V) (v : V) (d : Real) (e₁ e₂
 def udensity_at [G.LocallyFinite] (S : Set V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (((ball G (r + e₁) v) ∩ S).ncard : Real) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 
 -- todo: come back later and see if we can prove this without induction
 theorem slow_growth_at_ext {G : SimpleGraph V} [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
@@ -224,7 +224,7 @@ theorem slow_growth_at_reach {G : SimpleGraph V} [G.LocallyFinite] {u v : V}
     ((ball G r₁ v).ncard : Real) / ((ball G (r₂ + 1) v).ncard : Real) ≤
     ((ball G (r₁ + 1) u).ncard : Real) / ((ball G r₂ u).ncard : Real) := by
     apply div_le_div₀ (by simp) _ (by simp) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by simp)
-    <;> rw [ball_eq_union_ball _ _ _] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
+    <;> rw [ball_eq_union_ball] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
   have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
   apply ih ⟨Wwu⟩; rw [slow_growth_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
     ((slow_growth_at_ext 3 2).mp sg) ((slow_growth_at_ext 5).mp sg)
@@ -233,8 +233,6 @@ theorem slow_growth_at_reach {G : SimpleGraph V} [G.LocallyFinite] {u v : V}
 theorem slow_growth_at_all {G : SimpleGraph V} [G.LocallyFinite] {v : V}
   (c : G.Preconnected := by assumption) (sg : slow_growth_at G v := by assumption)
   : ∀ u, slow_growth_at G u := fun _ ↦ slow_growth_at_reach (c _ _)
-
-
 
 -- note: e₁ < e₂ is not provable in general by counterexample: tree with #children = depth
 theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
@@ -292,9 +290,11 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
   cases Decidable.em (e₁ = e₂) with | inl h => simp [h] | inr h =>
   rw [←slow_growth_at, slow_growth_at_ext]; exact sg
 
+@[simp] theorem fball_nonneg [G.LocallyFinite] {π : Policy V}
+  : 0 ≤ ∑ x ∈ ball G r v, π.f x := by simp [Finset.sum_nonneg, π.f0]
+
 @[simp] theorem fball_div_nonneg [G.LocallyFinite] {π : Policy V}
-  : 0 ≤ (∑ x ∈ (ball G r₁ v).toFinset, π.f x) / ↑(ball G r₂ v).ncard := by
-  simp [div_nonneg, Finset.sum_nonneg, π.f0]
+  : 0 ≤ (∑ x ∈ ball G r₁ v, π.f x) / ↑(ball G r₂ v).ncard := by simp [div_nonneg]
 
 @[simp] theorem fball_div_le_one [G.LocallyFinite] (h : r₁ ≤ r₂)
   : ((ball G r₁ v).ncard : Real) / ↑(ball G r₂ v).ncard ≤ 1 := by
@@ -334,50 +334,40 @@ theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {
     · apply fball_div_eventually_le <;> simp [*]
   constructor <;> apply impl
 
-
-#check le_antisymm
-#check le_trans
-#check ufdensity_at
-#check Filter.limsup_le_limsup
-#check Filter.isCoboundedUnder_le_of_eventually_le
-#check Filter.eventually_map
-#check Filter.eventually_forall_ge_atTop
-#check eventually_le_of_slow_growth_at
-#check one_add_one_eq_two (R := Nat)
-
 theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {u v : V} {d : Real}
-  (h : ufdensity_at G π v d := by assumption)
-  (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
+  (r : G.Reachable v u := by assumption) (h : ufdensity_at G π v d := by assumption)
+  (sg : slow_growth_at G v := by assumption)
   : ufdensity_at G π u d := by
   have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
-  apply ih _ ⟨Wwu⟩ (slow_growth_at_reach (SimpleGraph.Adj.reachable Avw))
+  apply ih ⟨Wwu⟩ _ (slow_growth_at_reach (SimpleGraph.Adj.reachable Avw))
   have sgw : slow_growth_at G w := slow_growth_at_reach (SimpleGraph.Adj.reachable Avw)
+  have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
+    (∑ x ∈ ball G r₁ v, π.f x) / (ball G (r₂ + 1) v).ncard ≤
+    (∑ x ∈ ball G (r₁ + 1) u, π.f x) / (ball G r₂ u).ncard := by
+    apply div_le_div₀ (by simp) _ (by simp)
+    · norm_cast; apply Set.ncard_le_ncard _ (by simp); rw [ball_eq_union_ball]
+      exact Set.subset_biUnion_of_mem (by simp [Avu])
+    · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by simp [π.f0])
+      rw [Set.subset_toFinset, Set.coe_toFinset, ball_eq_union_ball]
+      exact Set.subset_biUnion_of_mem (by simp [Avu.symm])
   rw [ufdensity_at_ext 1 1]; apply le_antisymm
-  · apply le_trans (b := Filter.limsup (fun r ↦
-      (∑ x ∈ (ball G (r + 2) v).toFinset, π.f x) / ↑(ball G (r + 0) v).ncard) Filter.atTop)
+  · apply le_trans (b := Filter.limsup
+      (fun r ↦ (∑ x ∈ ball G (r + 2) v, π.f x) / ↑(ball G (r + 0) v).ncard) Filter.atTop)
       _ (le_of_eq (by rw [←ufdensity_at, ufdensity_at_ext]; exact h))
     apply Filter.limsup_le_limsup
-    · sorry
+    · apply Filter.Eventually.of_forall; intro r; dsimp
+      rw [show r + 2 = r + 1 + 1 by ring]; exact helper _ _ _ _ Avw.symm
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
-    · exists π.m; rw [Filter.eventually_map];
-      apply Filter.Eventually.mono (eventually_le_of_slow_growth_at 2 0 1)
-      intro r q; dsimp
-      sorry
-  · sorry
+    · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
+  · apply le_trans (b := Filter.limsup
+      (fun r ↦ (∑ x ∈ ball G (r + 0) v, π.f x) / ↑(ball G (r + 2) v).ncard) Filter.atTop)
+      (le_of_eq (Eq.symm (by rw [←ufdensity_at, ufdensity_at_ext]; exact h)))
+    apply Filter.limsup_le_limsup
+    · apply Filter.Eventually.of_forall; intro r; dsimp
+      rw [show r + 2 = r + 1 + 1 by ring]; exact helper _ _ _ _ Avw
+    · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
+    · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
 
-theorem ufdensity_at_all [G.LocallyFinite] (f : V → Real) (v : V) (d : Real)
-  (sg : slow_growth_at G v) (sd : ufdensity_at G f v d) (c : G.Preconnected) :
-  ∀ u, ufdensity_at G f u d := fun _ ↦ ufdensity_at_reach _ _ _ _ _ sg (c _ _) sd
-
-
-theorem udensity_at_ext (S : Set V) (v : V) (d : ENNReal) (e : Nat) (s : slow_growth_at G v) :
-  udensity_at G S v d ↔ udensity_at G S v d e := by
-  sorry
-
-theorem udensity_reach [G.LocallyFinite] (S : Set V) (u v : V) (d : ENNReal) :
-  G.Reachable v u → udensity_at G S v d → udensity_at G S u d := by
-  sorry
-
-theorem udensity_all [G.LocallyFinite] (c : G.Preconnected) (S : Set V) (v : V) (d : ENNReal) :
-  udensity_at G S v d → ∀ u, udensity_at G S u d :=
-  fun h _ ↦ udensity_reach _ _ _ _ _ (c _ _) h
+theorem ufdensity_at_all [G.LocallyFinite]
+  (h : ufdensity_at G π v d) (sg : slow_growth_at G v) (c : G.Preconnected) :
+  ∀ u, ufdensity_at G π u d := fun _ ↦ ufdensity_at_reach (c _ _)
