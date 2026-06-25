@@ -19,4 +19,4 @@ jobs:
     - uses: leanprover/lean-action@v1
     - uses: leanprover-community/docgen-action@v1
       with:
-        build-page: false
+        homepage: false
