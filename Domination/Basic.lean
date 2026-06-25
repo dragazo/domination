@@ -4,8 +4,7 @@ notation "N(" G ", " v ")" => SimpleGraph.neighborSet G v
 notation "N[" G ", " v "]" => insert v N(G, v)
 notation A "∆" B => symmDiff A B
 
-universe u
-variable {V : Type u} (G : SimpleGraph V)
+variable {V : Type*} (G : SimpleGraph V)
 
 ----------------------------------------------------------------------------------------------------
 
@@ -173,12 +172,16 @@ def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real)  / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
-structure Policy (V : Type u) where
+structure Policy (V : Type*) where
   f : V → Real
   m : Real := 1
-  hm : 0 < m := by simp
-  f0 : ∀ r, 0 ≤ f r := by simp
-  fm : ∀ r, f r ≤ m := by simp
+  hm : 0 < m := by aesop
+  f0 : ∀ r, 0 ≤ f r := by aesop
+  fm : ∀ r, f r ≤ m := by aesop
+
+noncomputable def Policy₀₁ {V : Type*} (S : Set V) : Policy V := {
+  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
+}
 
 def ufdensity_at [G.LocallyFinite] (π : Policy V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (ball G (r + e₁) v), π.f x) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
@@ -368,6 +371,41 @@ theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V}
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
     · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
 
-theorem ufdensity_at_all [G.LocallyFinite]
-  (h : ufdensity_at G π v d) (sg : slow_growth_at G v) (c : G.Preconnected) :
-  ∀ u, ufdensity_at G π u d := fun _ ↦ ufdensity_at_reach (c _ _)
+theorem ufdensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
+  (c : G.Preconnected := by assumption) (h : ufdensity_at G π v d := by assumption)
+  (sg : slow_growth_at G v := by assumption)
+  : ∀ u, ufdensity_at G π u d := fun _ ↦ ufdensity_at_reach (c _ _)
+
+@[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype ↑s]
+  : ∑ x ∈ s, (Policy₀₁ S).f x = (s ∩ S).ncard := by simp [Policy₀₁, ←Set.ncard_coe_finset]
+
+theorem udensity_at_iff_ufdensity_at {G : SimpleGraph V} [G.LocallyFinite]
+  {S : Set V} {v : V} {e₁ e₂ : Nat} {d : Real}
+  : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy₀₁ S) v d e₁ e₂ := by
+  simp [ufdensity_at]; tauto
+
+theorem udensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V} {d : Real}
+  {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
+  : udensity_at G S v d e₁ e₂ ↔ udensity_at G S v d e₃ e₄ := by
+  simp only [udensity_at_iff_ufdensity_at]; apply ufdensity_at_ext; assumption
+
+theorem udensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {u v : V} {d : Real}
+  (r : G.Reachable v u := by assumption) (h : udensity_at G S v d := by assumption)
+  (sg : slow_growth_at G v := by assumption)
+  :  udensity_at G S u d := by
+  rw [udensity_at_iff_ufdensity_at] at ⊢ h; apply ufdensity_at_reach <;> assumption
+
+theorem udensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V} {d : Real}
+  (c : G.Preconnected := by assumption) (h : udensity_at G S v d := by assumption)
+  (sg : slow_growth_at G v := by assumption)
+  : ∀ u, udensity_at G S u d := fun _ ↦ udensity_at_reach (c _ _)
+
+structure tiling (G : SimpleGraph V) where
+  c : Type*
+  f : V → c
+  n : Nat
+  n0 : n ≠ 0
+  d : Nat
+  d0 : d ≠ 0
+  h₁ : ∀ c, {v | f v = c}.ncard = n
+  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d
