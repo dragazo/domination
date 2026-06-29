@@ -323,21 +323,21 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
 theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
   {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
   : ufdensity_at G π v d e₁ e₂ ↔ ufdensity_at G π v d e₃ e₄ := by
-  have impl e₁ e₂ e₃ e₄ (h : ufdensity_at G π v d e₁ e₂) : ufdensity_at G π v d e₃ e₄ := by
-    rw [ufdensity_at, ←Filter.limsup_nat_add _ e₁]; simp_rw [add_assoc]
-    rw [ufdensity_at, ←Filter.limsup_nat_add _ e₃] at h; simp_rw [add_assoc, add_comm e₃] at h
-    conv_lhs =>
-      arg 1; ext r
-      rw [←div_mul_div_cancel₀ (b := ((ball G (r + (e₂ + e₃)) v).ncard : Real)) (by simp), mul_comm]
-    conv_rhs => rw [←one_mul d]
-    apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ h (by simp) (by simp) _ _
-    · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext]; exact sg
-    · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
-      cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
-      rw [←slow_growth_at, slow_growth_at_ext]; exact sg
-    · apply fball_div_eventually_le <;> simp [*]
-  constructor <;> apply impl
+  suffices h : ∀ e₁ e₂ e₃ e₄, ufdensity_at G π v d e₁ e₂ → ufdensity_at G π v d e₃ e₄ by aesop
+  intro e₁ e₂ e₃ e₄ h
+  rw [ufdensity_at, ←Filter.limsup_nat_add _ e₁]; simp_rw [add_assoc]
+  rw [ufdensity_at, ←Filter.limsup_nat_add _ e₃] at h; simp_rw [add_assoc, add_comm e₃] at h
+  conv_lhs =>
+    arg 1; ext r
+    rw [←div_mul_div_cancel₀ (b := ((ball G (r + (e₂ + e₃)) v).ncard : Real)) (by simp), mul_comm]
+  conv_rhs => rw [←one_mul d]
+  apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ h (by simp) (by simp) _ _
+  · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
+    rw [←slow_growth_at, slow_growth_at_ext]; exact sg
+  · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
+    cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
+    rw [←slow_growth_at, slow_growth_at_ext]; exact sg
+  · apply fball_div_eventually_le <;> simp [*]
 
 theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {u v : V} {d : Real}
   (r : G.Reachable v u := by assumption) (h : ufdensity_at G π v d := by assumption)
@@ -395,7 +395,7 @@ theorem udensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
 
-structure tiling (G : SimpleGraph V) where
+structure Tiling (G : SimpleGraph V) where
   t : Type*
   f : V → t
   n : Nat
@@ -405,23 +405,27 @@ structure tiling (G : SimpleGraph V) where
   h₁ : ∀ t, {v | f v = t}.ncard = n
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d
 
-noncomputable instance (τ : tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n0
-@[simp] theorem tile_finite (τ : tiling G) (t : τ.t) : {v | τ.f v = t}.Finite :=
+@[simp] theorem tile_finite (τ : Tiling G) (t : τ.t) : {v | τ.f v = t}.Finite :=
   {v | τ.f v = t}.toFinite
 
-def utball {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V) :=
+def utball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
-def ltball {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V) :=
+def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 
-theorem tball_subset {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V)
+theorem tball_subset {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   : ltball τ r v ⊆ utball τ r v := by
   rw [utball, ltball]; apply Set.biUnion_subset_biUnion_left; rw [Set.setOf_subset_setOf]
   intro t h; suffices z : {x | τ.f x = t}.Nonempty by have ⟨x, hx⟩ := z; exact ⟨x, hx, h x hx⟩
   apply Set.nonempty_of_ncard_ne_zero; rw [τ.h₁]; exact τ.n0
 
-theorem utball_upper {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V)
+theorem utball_lower {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
+  : ball G r v ⊆ utball τ r v := by
+  simp only [ball, utball, Set.mem_setOf_eq, Set.iUnion_exists]; intro x h; aesop
+
+theorem utball_upper {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   : utball τ r v ⊆ ball G (r + τ.d) v := fun p h ↦ by
   simp only [utball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at h
   have ⟨q, h₁, h₂⟩ := h; clear h; apply τ.h₂ at h₁
@@ -430,32 +434,52 @@ theorem utball_upper {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V)
   · apply SimpleGraph.edist_triangle
   · rw [add_comm]; apply add_le_add <;> assumption
 
-theorem ltball_lower {G : SimpleGraph V} (τ : tiling G) (r : Nat) (v : V)
+theorem ltball_lower {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   : ball G r v ⊆ ltball τ (r + τ.d) v := fun p h ↦ by
   simp only [ball, Set.mem_setOf_eq] at h
   simp? [ltball, ball]
   sorry
 
-noncomputable instance [G.LocallyFinite] (τ : tiling G) : Fintype (utball τ r v) := by
+theorem ltball_upper {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
+  : ltball τ r v ⊆ ball G r v := by simp [ltball, ball]
+
+noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
   apply Set.Finite.fintype; apply Set.Finite.subset (by simp) (utball_upper _ _ _)
-@[simp] theorem utball_finite [G.LocallyFinite] (τ : tiling G) : (utball τ r v).Finite :=
+@[simp] theorem utball_finite [G.LocallyFinite] (τ : Tiling G) : (utball τ r v).Finite :=
   (utball τ r v).toFinite
 
-noncomputable instance [G.LocallyFinite] (τ : tiling G) : Fintype (ltball τ r v) := by
+noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (ltball τ r v) := by
   apply Set.Finite.fintype; apply Set.Finite.subset (by simp) (tball_subset _ _ _)
-@[simp] theorem ltball_finite [G.LocallyFinite] (τ : tiling G) : (ltball τ r v).Finite :=
+@[simp] theorem ltball_finite [G.LocallyFinite] (τ : Tiling G) : (ltball τ r v).Finite :=
   (ltball τ r v).toFinite
 
+def utufdensity_at {G : SimpleGraph V} [G.LocallyFinite]
+  (π : Policy V) (τ : Tiling G) (v : V) (d : Real) (e₁ e₂ : Nat := 0) := Filter.limsup
+  (fun r ↦ (∑ x ∈ (utball τ (r + e₁) v), π.f x) / (utball τ (r + e₂) v).ncard) Filter.atTop = d
+
+theorem utufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite]
+  {π : Policy V} {τ : Tiling G} {v : V} {e₁ e₂ : Nat} (e₃ e₄ : Nat := 0)
+  : utufdensity_at π τ v d e₁ e₂ ↔ utufdensity_at π τ v d e₃ e₄ := by
+  suffices ∀ e₁ e₂ e₃ e₄, utufdensity_at π τ v d e₁ e₂ → utufdensity_at π τ v d e₃ e₄ by aesop
+  intro e₁ e₂ e₃ e₄ h
+  unfold utufdensity_at
+
+
+  sorry
+
+
 #check tendsto_of_tendsto_of_tendsto_of_le_of_le
-theorem ufdensity_at_tiling {G : SimpleGraph V} [G.LocallyFinite] (π : Policy V) (τ : tiling G)
-  (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d)
+theorem ufdensity_at_tiling {G : SimpleGraph V} [G.LocallyFinite] (π : Policy V) (τ : Tiling G)
+  (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d / τ.n)
   (v : V) (sg : slow_growth_at G v)
   : ufdensity_at G π v d := by
-  rw [ufdensity_at_ext τ.d]
+  rw [ufdensity_at_ext τ.d τ.d]
   unfold ufdensity_at
   apply le_antisymm
   · apply le_trans (b := Filter.limsup (fun r ↦
-      (∑ x ∈ (utball τ (r + τ.d) v).toFinset, π.f x) / ↑(ball G (r + 0) v).ncard) Filter.atTop)
+      (∑ x ∈ (utball τ (r + τ.d) v).toFinset, π.f x) / ↑(utball τ (r + 0) v).ncard) Filter.atTop)
     · sorry
-    · sorry
+    · apply le_of_eq
+      -- rw [←utufdensity_at]
+      sorry
   · sorry
