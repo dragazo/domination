@@ -396,11 +396,31 @@ theorem udensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V
   : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
 
 structure tiling (G : SimpleGraph V) where
-  c : Type*
-  f : V → c
+  t : Type*
+  f : V → t
   n : Nat
   n0 : n ≠ 0
   d : Nat
   d0 : d ≠ 0
-  h₁ : ∀ c, {v | f v = c}.ncard = n
+  h₁ : ∀ t, {v | f v = t}.ncard = n
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d
+
+noncomputable instance efwfe {V : Type*} {G : SimpleGraph V} {τ : tiling G} {t : τ.t}
+  : Fintype {v | τ.f v = t} := by
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n0
+@[simp] theorem tile_finite (τ : tiling G) (t : τ.t) : {v | τ.f v = t}.Finite :=
+  {v | τ.f v = t}.toFinite
+
+def utball (τ : tiling G) (r : Nat) (v : V) :=
+  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
+def ltball (τ : tiling G) (r : Nat) (v : V) :=
+  ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
+
+
+
+theorem ufdensity_tiling {G : SimpleGraph V} [G.LocallyFinite] (π : Policy V) (τ : tiling G)
+  (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d)
+  (v : V) (sg : slow_growth_at G v)
+  : ufdensity_at G π v d := by
+
+  sorry
