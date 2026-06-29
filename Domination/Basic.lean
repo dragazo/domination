@@ -230,6 +230,10 @@ def slow_growth_at [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) := Filter.T
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
+def slow_tiling_at [G.LocallyFinite] (τ : Tiling G) (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
+  (fun r ↦ ((utball τ (r + e₁) v).ncard : Real) / ((utball τ (r + e₂) v).ncard : Real))
+  Filter.atTop (nhds 1)
+
 def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
   (fun r ↦ ((sphere G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
@@ -460,6 +464,43 @@ theorem udensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V
   (c : G.Preconnected := by assumption) (h : udensity_at G S v d := by assumption)
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
+
+theorem slow_tiling_at_ext {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
+  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
+  : slow_tiling_at G τ v e₁ e₂ ↔ slow_tiling_at G τ v e₃ e₄ := by
+  suffices ∀ e₁ e₂ e₃ e₄,
+    e₁ ≠ e₂ → e₃ ≠ e₄ → slow_tiling_at G τ v e₁ e₂ → slow_tiling_at G τ v e₃ e₄ by aesop
+  intro e₁ e₂ e₃ e₄ h₁₂ h₃₄ h
+  unfold slow_tiling_at
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+    (g := fun r ↦ ((ball G (r + (e₁ + τ.d)) v).ncard : Real) / (ball G (r + e₂) v).ncard)
+    (h := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + (e₂ + τ.d)) v).ncard)
+  sorry
+
+#check tendsto_of_tendsto_of_tendsto_of_le_of_le
+#check slow_growth_at_ext
+theorem slow_growth_at_iff_slow_tiling_at [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂) :
+  slow_growth_at G v e₁ e₂ ↔ slow_tiling_at G τ v e₁ e₂ := by
+  rw [slow_tiling_at_ext, slow_growth_at_ext]
+  constructor <;> intro h
+  · sorry
+  · sorry
+
+  -- constructor <;> intro h
+  -- · unfold slow_tiling_at
+  --   apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+  --     (g := fun r ↦ ((ball G (r + (e₁ + τ.d)) v).ncard : Real) / (ball G (r + e₂) v).ncard)
+  --     (h := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + (e₂ + τ.d)) v).ncard)
+  --   · sorry
+  --   · rw [←slow_growth_at, slow_growth_at_ext e₁ e₂ _ _]
+  --     · exact h
+  --     · by_contra p
+  --     · sorry
+  --   · sorry
+  --   · sorry
+  -- · sorry
+
+
 
 theorem utufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite]
   {π : Policy V} {τ : Tiling G} {v : V} {e₁ e₂ : Nat} (e₃ e₄ : Nat := 0)
