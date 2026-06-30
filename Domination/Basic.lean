@@ -1,88 +1,11 @@
 import Mathlib
+import Domination.General
 
 notation "N(" G ", " v ")" => SimpleGraph.neighborSet G v
 notation "N[" G ", " v "]" => insert v N(G, v)
 notation A "∆" B => symmDiff A B
 
 variable {V : Type*} (G : SimpleGraph V)
-
-----------------------------------------------------------------------------------------------------
-
-def at_least (k : Nat) (S : Set V) := match k with
-  | 0 => True
-  | k' + 1 => ∃ x, x ∈ S ∧ at_least k' (S \ {x})
-
-theorem at_least_subset {k : Nat} {S T : Set V} : S ⊆ T → at_least k S → at_least k T :=
-  k.recOn
-  (fun _ _ _ _ ↦ trivial)
-  (fun _ ih _ _ s ⟨_, a, b⟩ ↦ ⟨_, s a, ih _ _ (Set.diff_subset_diff_left s) b⟩)
-  S T
-
-theorem at_least_le {k₁ k₂ : Nat} {S : Set V} : k₁ ≤ k₂ → at_least k₂ S → at_least k₁ S :=
-  Nat.leRec (fun h ↦ h) (fun _ _ ih ⟨_, _, p⟩ ↦ ih (at_least_subset Set.diff_subset p))
-
-theorem at_least_union {k : Nat} {S T : Set V} :
-  at_least k (S ∪ T) → ∃ k₁ k₂, k = k₁ + k₂ ∧ at_least k₁ S ∧ at_least k₂ T :=
-  k.recOn
-  (fun _ _ _ ↦ ⟨0, 0, rfl, trivial, trivial⟩)
-  (fun _ ih _ _ ⟨x, p, h⟩ ↦ have ⟨k₁, k₂, a, b, c⟩ := ih _ _ (Set.union_diff_distrib ▸ h); p.elim
-    (fun l ↦ ⟨k₁ + 1, k₂, by omega, ⟨x, l, b⟩, at_least_subset Set.diff_subset c⟩)
-    (fun r ↦ ⟨k₁, k₂ + 1, by omega, at_least_subset Set.diff_subset b, ⟨x, r, c⟩⟩))
-  S T
-
-theorem at_least_union_ph {k : Nat} {S T : Set V} :
-  at_least (2 * k + 1) (S ∪ T) → at_least (k + 1) S ∨ at_least (k + 1) T :=
-  fun h ↦ have ⟨k₁, k₂, p, q, r⟩ := at_least_union h; (Nat.lt_or_ge k₁ (k + 1)).elim
-    (fun _ ↦ (Nat.lt_or_ge k₂ (k + 1)).elim
-      (fun _ ↦ by omega)
-      (fun y ↦ Or.inr (at_least_le y r)))
-    (fun x ↦ Or.inl (at_least_le x q))
-
-----------------------------------------------------------------------------------------------------
-
-def pointwise (P : V → Prop) := ∀ v, P v
-def pairwise (P : V → V → Prop) := ∀ u v, u ≠ v → P u v
-
-----------------------------------------------------------------------------------------------------
-
-def open_dom (k : Nat) (S : Set V) (v : V) := at_least k (N(G, v) ∩ S)
-def closed_dom (k : Nat) (S : Set V) (v : V) := at_least k (N[G, v] ∩ S)
-
-----------------------------------------------------------------------------------------------------
-
-def open_dist (k : Nat) (S : Set V) (u v : V) := at_least k ((N(G, u) ∆ N(G, v)) ∩ S)
-def closed_dist (k : Nat) (S : Set V) (u v : V) := at_least k ((N[G, u] ∆ N[G, v]) ∩ S)
-def self_dist (k : Nat) (S : Set V) (u v : V) := at_least k (((N(G, u) ∆ N(G, v)) ∪ {u, v}) ∩ S)
-
-----------------------------------------------------------------------------------------------------
-
-def sharp_open_dist (k : Nat) (S : Set V) (u v : V) :=
-  at_least k ((N(G, u) \ N(G, v)) ∩ S) ∨ at_least k ((N(G, v) \ N(G, u)) ∩ S)
-def sharp_closed_dist (k : Nat) (S : Set V) (u v : V) :=
-  at_least k ((N[G, u] \ N[G, v]) ∩ S) ∨ at_least k ((N[G, v] \ N[G, u]) ∩ S)
-
-----------------------------------------------------------------------------------------------------
-
-def odom (S : Set V) := pointwise (open_dom G 1 S)
-def old (S : Set V) := pointwise (open_dom G 1 S) ∧ pairwise (open_dist G 1 S)
-def redold (S : Set V) := pointwise (open_dom G 2 S) ∧ pairwise (open_dist G 2 S)
-def detold (S : Set V) := pointwise (open_dom G 2 S) ∧ pairwise (sharp_open_dist G 2 S)
-def errold (S : Set V) := pointwise (open_dom G 3 S) ∧ pairwise (open_dist G 3 S)
-
-----------------------------------------------------------------------------------------------------
-
-@[simp] theorem inter_inter_disjoint_of_disjoint {α : Type u} (s t w : Set α) (h : Disjoint s t) :
-  Disjoint (s ∩ w) (t ∩ w) := by
-  intro x
-  simp only [Set.le_eq_subset, Set.subset_inter_iff, Set.bot_eq_empty, Set.subset_empty_iff]
-  rw [Set.eq_empty_iff_forall_notMem]
-  intro ⟨a, _⟩ ⟨b, _⟩ _ c
-  exact (Set.disjoint_iff_forall_ne.mp h) (a c) (b c) rfl
-
-@[simp] theorem ncard_div_nonneg {α : Type u} (s t : Set α) :
-  0 ≤ (s.ncard : Real) / (t.ncard : Real) := by simp [div_nonneg]
-
-----------------------------------------------------------------------------------------------------
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 def sphere (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
@@ -92,12 +15,10 @@ theorem ball_eq_union_ball (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
   · rw [SimpleGraph.edist_comm] at h; have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_ne_top
       (ne_top_of_le_ne_top (fun _ ↦ by contradiction) h)
-    cases W_vx with
-    | nil => simp
-    | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
-        rw [SimpleGraph.Walk.length_cons] at L_vx
-        rw [←L_vx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
-        exact le_trans (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
+    cases W_vx with | nil => simp | @cons v w x A_vw W_wx => apply Or.inr ⟨w, A_vw, by
+    rw [SimpleGraph.Walk.length_cons] at L_vx
+    rw [←L_vx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
+    exact le_trans (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
   · rw [Nat.cast_add]; match h with
     | Or.inl h => exact le_trans h le_self_add
     | Or.inr ⟨i, A_vi, D_xi⟩ =>
@@ -168,25 +89,26 @@ structure Tiling where
   t : Type*
   f : V → t
   n : Nat
-  n0 : n ≠ 0
   d : Nat
-  d0 : d ≠ 0
-  h₁ : ∀ t, {v | f v = t}.ncard = n
-  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d
+  n0 : n ≠ 0 := by norm_num
+  d0 : d ≠ 0 := by norm_num
+  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
+  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
+
+noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n0
 
 def utball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 
-noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n0
+def Tiling.id : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
-theorem tball_subset {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
-  : ltball τ r v ⊆ utball τ r v := by
-  rw [utball, ltball]; apply Set.biUnion_subset_biUnion_left; rw [Set.setOf_subset_setOf]
-  intro t h; suffices z : {x | τ.f x = t}.Nonempty by obtain ⟨x, hx⟩ := z; exact ⟨x, hx, h x hx⟩
-  apply Set.nonempty_of_ncard_ne_zero; rw [τ.h₁]; exact τ.n0
+@[simp] theorem Tiling.id.utball_eq : utball (Tiling.id G) r v = ball G r v := by
+  rw [utball, ball]; aesop
+@[simp] theorem Tiling.id.ltball_eq : ltball (Tiling.id G) r v = ball G r v := by
+  rw [ltball, ball]; aesop
 
 theorem utball_nonempty : (utball τ r v).Nonempty := by
   apply Set.nonempty_of_mem (x := v)
@@ -211,6 +133,17 @@ theorem utball_upper {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   · apply SimpleGraph.edist_triangle
   · rw [add_comm]; apply add_le_add <;> assumption
 
+noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
+  apply Set.Finite.fintype; apply Set.Finite.subset (ball G _ v).toFinite (utball_upper _ _ _)
+
+macro "utball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
+  utball_nonempty, utball_subset, utball_lower, utball_upper,
+  Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
+  Pi.le_def, one_le_div, div_le_div_iff_of_pos_right,
+  $h,*
+])
+macro "utball!" : tactic => `(tactic| utball! [])
+
 theorem ltball_lower {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   : ball G r v ⊆ ltball τ (r + τ.d) v := fun p h ↦ by
   simp only [ball, ltball, Set.mem_setOf_eq] at ⊢ h
@@ -222,20 +155,8 @@ theorem ltball_lower {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
 theorem ltball_upper {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
   : ltball τ r v ⊆ ball G r v := by simp [ltball, ball]
 
-noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (ball G _ v).toFinite (utball_upper _ _ _)
-
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (ltball τ r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (utball τ r v).toFinite (tball_subset _ _ _)
-
-
-macro "tball_facts" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
-  utball_nonempty, utball_subset, utball_lower, utball_upper,
-  Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
-  Pi.le_def, one_le_div, div_le_div_iff_of_pos_right,
-  $h,*
-])
-macro "tball_facts" : tactic => `(tactic| tball_facts [])
+  apply Set.Finite.fintype; apply Set.Finite.subset (ball G r v).toFinite (ltball_upper _ _ _)
 
 ----------------------------------------------------------------------------------------------------
 
@@ -256,8 +177,8 @@ structure Policy (V : Type*) where
   f : V → Real
   m : Real := 1
   hm : 0 < m := by norm_num
-  f0 : ∀ r, 0 ≤ f r := by aesop
-  fm : ∀ r, f r ≤ m := by aesop
+  f₀ : ∀ r, 0 ≤ f r := by aesop
+  fₘ : ∀ r, f r ≤ m := by aesop
 
 noncomputable def Policy₀₁ {V : Type*} (S : Set V) : Policy V := {
   f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
@@ -347,27 +268,13 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
       cases e₁ with | zero => simp [slow_growth_at] | succ e₁ =>
       rw [slow_growth_at_iff_slow_boundary_at v (e₁ + 1) 0 (by omega)]
       have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
-        (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def])
+        (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def, div_nonneg])
         (f := fun r ↦ ↑(sphere G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
         (by simp [Pi.le_def, ←add_assoc, div_le_div_of_nonneg_left])
       simp_rw [show ∀ r : Nat, r + e₁ + 1 + 1 = r + 1 + e₁ + 1 by intro; ring] at t
       rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
         (f := fun r ↦ ↑(sphere G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
       exact t
-
-theorem limsup_mul_eq {f g : Nat → Real}
-  (l₁ : Filter.Tendsto f Filter.atTop (nhds y₁)) (l₂ : Filter.limsup g Filter.atTop = y₂)
-  (p₁ : ∀ r, 0 ≤ f r) (p₂ : ∀ r, 0 ≤ g r)
-  (b₁ : ∀ᶠ r in Filter.atTop, f r ≤ m₁) (b₂ : ∀ᶠ r in Filter.atTop, g r ≤ m₂) :
-  Filter.limsup (f * g) Filter.atTop = y₁ * y₂ := by
-  apply le_antisymm
-  · rw [←Filter.Tendsto.limsup_eq l₁, ←l₂]; apply limsup_mul_le _ (by exists m₁) _ (by exists m₂)
-    · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₁]
-    · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₂]
-  · rw [mul_comm y₁, ←Filter.Tendsto.liminf_eq l₁, ←l₂, mul_comm f]
-    apply le_limsup_mul _ (by exists m₂) _ (by exists m₁)
-    · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₂]
-    · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₁]
 
 theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
   (e₁ e₂ : Nat) (ε : Real := 1) (hε : 0 < ε := by simp) (sg : slow_growth_at G v := by assumption)
@@ -377,7 +284,7 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
   rw [←slow_growth_at, slow_growth_at_ext]; exact sg
 
 @[simp] theorem fball_nonneg [G.LocallyFinite] {π : Policy V}
-  : 0 ≤ ∑ x ∈ ball G r v, π.f x := by simp [Finset.sum_nonneg, π.f0]
+  : 0 ≤ ∑ x ∈ ball G r v, π.f x := by simp [Finset.sum_nonneg, π.f₀]
 
 @[simp] theorem fball_div_nonneg [G.LocallyFinite] {π : Policy V}
   : 0 ≤ (∑ x ∈ ball G r₁ v, π.f x) / ↑(ball G r₂ v).ncard := by simp [div_nonneg]
@@ -389,7 +296,7 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
 @[simp] theorem fball_le_mball [G.LocallyFinite] {π : Policy V}
   : (∑ x ∈ (ball G r v), π.f x) ≤ π.m * ↑(ball G r v).ncard := by
   rw [Set.ncard_eq_toFinset_card _, mul_comm, ←nsmul_eq_mul]
-  apply Finset.sum_le_card_nsmul; simp [π.fm]
+  apply Finset.sum_le_card_nsmul; simp [π.fₘ]
 
 @[simp] theorem fball_div_eventually_le [G.LocallyFinite] {π : Policy V}
   (e₁ e₂ : Nat) (ε : Real := 1) (hε : 0 < ε := by simp) (sg : slow_growth_at G v := by assumption)
@@ -415,7 +322,7 @@ theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {
     arg 1; ext r
     rw [←div_mul_div_cancel₀ (b := ((ball G (r + (e₂ + e₃)) v).ncard : Real)) (by simp), mul_comm]
   conv_rhs => rw [←one_mul d]
-  apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ h (by simp) (by simp) _ _
+  apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ h (by simp [div_nonneg]) (by simp) _ _
   · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => simp [t] | inr t =>
     rw [←slow_growth_at, slow_growth_at_ext]; exact sg
   · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
@@ -436,7 +343,7 @@ theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V}
     apply div_le_div₀ (by simp) _ (by simp)
     · norm_cast; apply Set.ncard_le_ncard _ (by simp); rw [ball_eq_union_ball]
       exact Set.subset_biUnion_of_mem (by simp [Avu])
-    · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by simp [π.f0])
+    · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by simp [π.f₀])
       rw [Set.subset_toFinset, Set.coe_toFinset, ball_eq_union_ball]
       exact Set.subset_biUnion_of_mem (by simp [Avu.symm])
   rw [ufdensity_at_ext 1 1]; apply le_antisymm
@@ -490,9 +397,9 @@ theorem slow_tiling_at_ext {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
   | e₁ + 1, 0, _ => by
     cases Decidable.em (e₁ = 0) with | inl t => simp [t] | inr =>
     rw [←helper e₁ 0 (by omega)]; unfold slow_tiling_at; constructor <;> intro h
-    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> tball_facts
+    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> utball!
     · conv =>
-        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(utball τ (r + 1) v).ncard) (by tball_facts)]
+        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(utball τ (r + 1) v).ncard) (by utball!)]
       conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
       apply Filter.Tendsto.mul
       · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
@@ -519,19 +426,19 @@ theorem slow_growth_at_iff_slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] 
     · simp_rw [add_assoc]; rw [←slow_growth_at]
       cases Decidable.em ((e₁ + τ.d) = e₂) with | inl t => simp [t, slow_growth_at] | inr =>
       rw [slow_growth_at_ext e₁ e₂]; exact h
-    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> tball_facts
+    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> utball!
   · unfold slow_growth_at; rw [←Filter.tendsto_add_atTop_iff_nat τ.d]
     simp_rw [add_assoc, add_comm τ.d, ←add_assoc]
     apply tendsto_of_tendsto_of_tendsto_of_le_of_le
       (g := fun r ↦ ((utball τ (r + e₁) v).ncard : Real) / (utball τ (r + e₂ + τ.d) v).ncard)
       (h := fun r ↦ ((utball τ (r + e₁ + τ.d) v).ncard : Real) / (utball τ (r + e₂) v).ncard)
     · simp_rw [add_assoc]; rw [←slow_tiling_at]
-      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => tball_facts [t, slow_tiling_at] | inr =>
+      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => utball! [t, slow_tiling_at] | inr =>
       rw [slow_tiling_at_ext e₁ e₂]; exact h
     · simp_rw [add_assoc]; rw [←slow_tiling_at]
-      cases Decidable.em (e₁ + τ.d = e₂) with | inl t => tball_facts [t, slow_tiling_at] | inr =>
+      cases Decidable.em (e₁ + τ.d = e₂) with | inl t => utball! [t, slow_tiling_at] | inr =>
       rw [slow_tiling_at_ext e₁ e₂]; exact h
-    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> tball_facts
+    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> utball!
 
 
 #check div_le_div_iff_of_pos_right
