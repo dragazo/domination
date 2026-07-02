@@ -1,9 +1,9 @@
 import Mathlib
 import Domination.General
 
-variable {V : Type*} (G : SimpleGraph V)
+----------------------------------------------------------------------------------------------------
 
-structure Tiling where
+structure Tiling (G : SimpleGraph V) where
   t : Type*
   f : V → t
   n : Nat
@@ -13,19 +13,32 @@ structure Tiling where
   h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
-def Tiling.id : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
+def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
 noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
+structure Policy (V : Type*) where
+  f : V → Real
+  m : Real := 1
+  hm : 0 < m := by norm_num
+  f₀ : ∀ r, 0 ≤ f r := by aesop
+  fₘ : ∀ r, f r ≤ m := by aesop
+
+noncomputable def Policy.set (S : Set V) : Policy V := {
+  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
+}
+
 ----------------------------------------------------------------------------------------------------
 
-def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
-def shell (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
 
-def utball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
+def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
+def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+
+def utball (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
-def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
+def ltball (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 
 @[simp] theorem Tiling.id.utball_eq : utball (Tiling.id G) r v = ball G r v := by
@@ -35,8 +48,7 @@ def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
 
 ----------------------------------------------------------------------------------------------------
 
-theorem utball_eq_union_utball {G : SimpleGraph V} {τ : Tiling G}
-  : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
+theorem utball_eq_union_utball : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
   ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
     Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
     forall_exists_index, and_imp]
@@ -190,44 +202,37 @@ macro "ltball!" : tactic => `(tactic| ltball! [])
 
 ----------------------------------------------------------------------------------------------------
 
-def slow_growth_at [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
+def slow_growth_at (G : SimpleGraph V) [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) :=
+  Filter.Tendsto
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-def slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] (τ : Tiling G) (v : V) (e₁ := 1) (e₂ := 0)
-  := Filter.Tendsto
+def slow_tiling_at [G.LocallyFinite] (τ : Tiling G) (v : V) (e₁ := 1) (e₂ := 0) :=
+  Filter.Tendsto
   (fun r ↦ ((utball τ (r + e₁) v).ncard : Real) / ((utball τ (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
+def slow_boundary_at (G : SimpleGraph V) [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) :=
+  Filter.Tendsto
   (fun r ↦ ((shell G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
-structure Policy (V : Type*) where
-  f : V → Real
-  m : Real := 1
-  hm : 0 < m := by norm_num
-  f₀ : ∀ r, 0 ≤ f r := by aesop
-  fₘ : ∀ r, f r ≤ m := by aesop
-
-noncomputable def Policy₀₁ {V : Type*} (S : Set V) : Policy V := {
-  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
-}
-
-def ufdensity_at [G.LocallyFinite] (π : Policy V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
+def ufdensity_at (G : SimpleGraph V) [G.LocallyFinite]
+  (π : Policy V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (ball G (r + e₁) v), π.f x) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
-def utufdensity_at {G : SimpleGraph V} [G.LocallyFinite]
-  (π : Policy V) (τ : Tiling G) (v : V) (d : Real) (e₁ e₂ : Nat := 0) := Filter.limsup
+def utufdensity_at [G.LocallyFinite] (τ : Tiling G)
+  (π : Policy V) (v : V) (d : Real) (e₁ e₂ : Nat := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (utball τ (r + e₁) v), π.f x) / (utball τ (r + e₂) v).ncard) Filter.atTop = d
 
-def udensity_at [G.LocallyFinite] (S : Set V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
+def udensity_at (G : SimpleGraph V) [G.LocallyFinite]
+  (S : Set V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (((ball G (r + e₁) v) ∩ S).ncard : Real) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
 ----------------------------------------------------------------------------------------------------
 
 -- todo: refractor this to use the tiling ext theorem with a unit tile
-theorem slow_growth_at_ext {G : SimpleGraph V} [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
+theorem slow_growth_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
   (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
   : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
@@ -337,7 +342,7 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
     apply mul_le_mul_of_nonneg_left _ (le_of_lt π.hm); exact q
 
 @[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype ↑s]
-  : ∑ x ∈ s, (Policy₀₁ S).f x = (s ∩ S).ncard := by simp [Policy₀₁, ←Set.ncard_coe_finset]
+  : ∑ x ∈ s, (Policy.set S).f x = (s ∩ S).ncard := by simp [Policy.set, ←Set.ncard_coe_finset]
 
 theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
   {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
@@ -395,8 +400,8 @@ theorem ufdensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, ufdensity_at G π u d := fun v ↦ ufdensity_at_reach (c _ _)
 
-theorem udensity_at_iff_ufdensity_at {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V}
-  {e₁ e₂ : Nat} {d : Real} : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy₀₁ S) v d e₁ e₂ := by
+theorem udensity_at_iff_ufdensity_at [G.LocallyFinite] {v : V} {e₁ e₂ : Nat} {d : Real}
+  : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy.set S) v d e₁ e₂ := by
   simp [udensity_at, ufdensity_at]
 
 theorem udensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V} {d : Real}
@@ -491,10 +496,9 @@ theorem slow_growth_at_iff_slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] 
 
 
 
-theorem utufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite]
-  {π : Policy V} {τ : Tiling G} {v : V} {e₁ e₂ : Nat} (e₃ e₄ : Nat := 0)
-  : utufdensity_at π τ v d e₁ e₂ ↔ utufdensity_at π τ v d e₃ e₄ := by
-  suffices ∀ e₁ e₂ e₃ e₄, utufdensity_at π τ v d e₁ e₂ → utufdensity_at π τ v d e₃ e₄ by aesop
+theorem utufdensity_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat} (e₃ e₄ : Nat := 0)
+  : utufdensity_at τ π v d e₁ e₂ ↔ utufdensity_at τ π v d e₃ e₄ := by
+  suffices ∀ e₁ e₂ e₃ e₄, utufdensity_at τ π v d e₁ e₂ → utufdensity_at τ π v d e₃ e₄ by aesop
   intro e₁ e₂ e₃ e₄ h
   unfold utufdensity_at
 
