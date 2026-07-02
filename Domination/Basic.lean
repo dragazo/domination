@@ -21,8 +21,8 @@ theorem ball_eq_union_ball (v : V) (r : Nat) : (ball G (r + 1) v) = ⋃ u ∈ N[
   ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
   · rw [SimpleGraph.edist_comm] at h; have ⟨W_vx, L_vx⟩ := SimpleGraph.exists_walk_of_edist_ne_top
-      (ne_top_of_le_ne_top (fun _ ↦ by contradiction) h)
-    cases W_vx with | nil => simp | @cons v w x A_vw W_wx => apply Or.inr ⟨w, A_vw, by
+      (ne_top_of_le_ne_top (by tauto) h)
+    cases W_vx with | nil => simp | @cons v w x A_vw W_wx => exact Or.inr ⟨w, A_vw, by
     rw [SimpleGraph.Walk.length_cons] at L_vx
     rw [←L_vx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
     exact le_trans (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le W_wx)) h⟩
@@ -43,8 +43,7 @@ noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype (ball G r v
 macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   ball_nonempty, ball_subset,
   Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
-  Pi.le_def, one_le_div, pos_of_ne_zero, div_le_div_iff_of_pos_right,
-  div_le_div_of_nonneg_left, div_le_one,
+  Pi.le_def, one_le_div, div_le_one, div_le_div_iff_of_pos_right,
   $h,*
 ])
 macro "ball!" : tactic => `(tactic| ball! [])
