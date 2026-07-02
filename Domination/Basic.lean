@@ -1,15 +1,67 @@
 import Mathlib
 import Domination.General
 
-notation "N(" G ", " v ")" => SimpleGraph.neighborSet G v
-notation "N[" G ", " v "]" => insert v N(G, v)
-notation A "∆" B => symmDiff A B
-
 variable {V : Type*} (G : SimpleGraph V)
+
+structure Tiling where
+  t : Type*
+  f : V → t
+  n : Nat
+  d : Nat
+  n₀ : n ≠ 0 := by norm_num
+  d₀ : d ≠ 0 := by norm_num
+  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
+  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
+
+def Tiling.id : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
+
+noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
 ----------------------------------------------------------------------------------------------------
 
 def ball (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
+def shell (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+
+def utball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
+  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
+def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
+  ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
+
+@[simp] theorem Tiling.id.utball_eq : utball (Tiling.id G) r v = ball G r v := by
+  rw [utball, ball]; aesop
+@[simp] theorem Tiling.id.ltball_eq : ltball (Tiling.id G) r v = ball G r v := by
+  rw [ltball, ball]; aesop
+
+----------------------------------------------------------------------------------------------------
+
+theorem utball_eq_union_utball {G : SimpleGraph V} {τ : Tiling G}
+  : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
+  ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
+    Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
+    forall_exists_index, and_imp]
+  · intro y τxy yvd; rw [G.edist_comm] at yvd
+    have ⟨vy, vyd⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) yvd)
+    cases vy with
+    | nil => exists v; apply And.intro (by simp); exists v; simp [τxy]
+    | @cons v w x vw wy =>
+      exists w; apply And.intro (by rw [G.adj_comm] at vw; simp [G.edist_le_one_iff_adj_or_eq, vw])
+      exists y; apply And.intro τxy; rw [SimpleGraph.Walk.length_cons] at vyd
+      rw [←ENat.add_le_add_iff_right (k := 1) (by decide)]; apply le_trans _ yvd
+      rw [←vyd, Nat.cast_add, ENat.coe_one, ENat.add_le_add_iff_right (by decide), G.edist_comm]
+      apply SimpleGraph.Walk.edist_le
+  · intro y yvd z τxz zyd; exists z; apply And.intro τxz
+    exact le_trans (b := G.edist z y + G.edist y v) G.edist_triangle (add_le_add zyd yvd)
+
+theorem ball_eq_union_ball : (ball G (r + 1) v) = ⋃ u ∈ ball G 1 v, ball G r u := by
+  rw [←Tiling.id.utball_eq]; conv_rhs => rhs; ext u; rhs; ext h; rw [←Tiling.id.utball_eq]
+  exact utball_eq_union_utball
+
+----------------------------------------------------------------------------------------------------
+
+@[simp] theorem ball₁ : (ball G 1 v) = insert v (G.neighborSet v) := by
+  ext x; rw [ball, Set.mem_insert_iff, SimpleGraph.mem_neighborSet, or_comm, G.adj_comm]
+  exact G.edist_le_one_iff_adj_or_eq
 
 theorem ball_nonempty : (ball G r v).Nonempty := by
   apply Set.nonempty_of_mem (x := v); simp [ball]
@@ -17,25 +69,10 @@ theorem ball_nonempty : (ball G r v).Nonempty := by
 theorem ball_subset (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
   intro x hx; rw [ball, Set.mem_setOf_eq] at ⊢ hx; apply le_trans hx; simp [h]
 
-theorem ball_eq_union_ball : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
-  ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
-    Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
-  · rw [G.edist_comm] at h
-    have ⟨Wvx, Lvx⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) h)
-    cases Wvx with | nil => simp | @cons v w x Avw Wwx => exact Or.inr ⟨w, Avw, by
-    rw [SimpleGraph.Walk.length_cons] at Lvx
-    rw [←Lvx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
-    exact le_trans (G.edist_comm ▸ (G.edist_le Wwx)) h⟩
-  · rw [Nat.cast_add]; match h with
-    | Or.inl h => exact le_trans h le_self_add | Or.inr ⟨i, Avi, Dxi⟩ =>
-    apply le_trans (b := G.edist x i + G.edist i v) G.edist_triangle
-    apply add_le_add Dxi
-    rw [G.edist_comm, G.edist_eq_one_iff_adj.mpr Avi, Nat.cast_one]
-
 noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
   apply Set.Finite.fintype; induction r generalizing v with | zero => simp [ball] | succ r ih =>
-  rw [ball_eq_union_ball]
-  exact Set.Finite.biUnion (Set.finite_insert.mpr (Set.toFinite _)) (fun _ _ ↦ ih)
+  rw [ball_eq_union_ball]; apply Set.Finite.biUnion
+    (by rw [ball₁]; exact Set.finite_insert.mpr (Set.toFinite _)) (fun _ _ ↦ ih)
 
 macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   ball_nonempty, ball_subset,
@@ -46,8 +83,6 @@ macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| sim
 macro "ball!" : tactic => `(tactic| ball! [])
 
 ----------------------------------------------------------------------------------------------------
-
-def shell (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
 theorem ball_eq_ball_shell : (ball G (r + 1) v) = (ball G r v) ∪ (shell G (r + 1) v) := by
   ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_union]
@@ -80,30 +115,13 @@ macro "shell!" : tactic => `(tactic| shell! [])
 
 ----------------------------------------------------------------------------------------------------
 
-structure Tiling where
-  t : Type*
-  f : V → t
-  n : Nat
-  d : Nat
-  n0 : n ≠ 0 := by norm_num
-  d0 : d ≠ 0 := by norm_num
-  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
-  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
-noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n0
 
-def utball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
-  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
-def ltball {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V) :=
-  ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 
-def Tiling.id : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
-@[simp] theorem Tiling.id.utball_eq : utball (Tiling.id G) r v = ball G r v := by
-  rw [utball, ball]; aesop
-@[simp] theorem Tiling.id.ltball_eq : ltball (Tiling.id G) r v = ball G r v := by
-  rw [ltball, ball]; aesop
+
+
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -131,24 +149,6 @@ theorem utball_upper {G : SimpleGraph V} {τ : Tiling G}
 
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
   apply Set.Finite.fintype; exact Set.Finite.subset (ball G _ v).toFinite utball_upper
-
-theorem utball_eq_union_utball {G : SimpleGraph V} {τ : Tiling G}
-  : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
-  ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
-    Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
-    forall_exists_index, and_imp]
-  · intro y τxy yvd; rw [G.edist_comm] at yvd
-    have ⟨vy, vyd⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) yvd)
-    cases vy with
-    | nil => exists v; apply And.intro (by simp); exists v; simp [τxy]
-    | @cons v w x vw wy =>
-      exists w; apply And.intro (by rw [G.adj_comm] at vw; simp [G.edist_le_one_iff_adj_or_eq, vw])
-      exists y; apply And.intro τxy; rw [SimpleGraph.Walk.length_cons] at vyd
-      rw [←ENat.add_le_add_iff_right (k := 1) (by decide)]; apply le_trans _ yvd
-      rw [←vyd, Nat.cast_add, ENat.coe_one, ENat.add_le_add_iff_right (by decide), G.edist_comm]
-      apply SimpleGraph.Walk.edist_le
-  · intro y yvd z τxz zyd; exists z; apply And.intro τxz
-    exact le_trans (b := G.edist z y + G.edist y v) G.edist_triangle (add_le_add zyd yvd)
 
 macro "utball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   utball_nonempty, utball_subset, utball_lower, utball_upper,
