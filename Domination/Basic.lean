@@ -47,44 +47,36 @@ macro "ball!" : tactic => `(tactic| ball! [])
 
 ----------------------------------------------------------------------------------------------------
 
-def sphere (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+def shell (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
-theorem ball_eq_ball_sphere (v : V) (r : Nat) :
-  (ball G (r + 1) v) = (ball G r v) ∪ (sphere G (r + 1) v) := by
-  ext x; simp only [ball, sphere, Set.mem_setOf_eq, Set.mem_union]
-  cases G.edist x v with
-  | top => exact ⟨fun h ↦ by contradiction, fun h ↦ h.elim (by simp) (fun h ↦ by contradiction)⟩
-  | coe d => norm_cast; omega
+theorem ball_eq_ball_shell : (ball G (r + 1) v) = (ball G r v) ∪ (shell G (r + 1) v) := by
+  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_union]
+  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
 
-theorem sphere_eq_ball_sub (v : V) (r : Nat) :
-  sphere G (r + 1) v = (ball G (r + 1) v) \ (ball G r v) := by
-  ext x; simp only [ball, sphere, Set.mem_setOf_eq, Set.mem_diff]
-  cases G.edist x v with
-  | top => exact ⟨fun h ↦ by contradiction, fun ⟨h, g⟩ ↦ by contradiction⟩
-  | coe d => norm_cast; omega
+theorem shell_eq_ball_sub : shell G (r + 1) v = (ball G (r + 1) v) \ (ball G r v) := by
+  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_diff]
+  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
 
-theorem ball_sphere_disjoint (v : V) (r : Nat) :
-  Disjoint (ball G r v) (sphere G (r + 1) v) := by
+theorem ball_shell_disjoint (h : r₁ < r₂) : Disjoint (ball G r₁ v) (shell G r₂ v) := by
   intro s; simp only [Set.le_eq_subset, Set.bot_eq_empty, Set.subset_empty_iff]; intro a b
-  rw [Set.eq_empty_iff_forall_notMem]; intro x h
-  have g := h; apply a at h; apply b at g; simp only [ball, sphere, Set.mem_setOf_eq] at h g
+  rw [Set.eq_empty_iff_forall_notMem]; intro x hx
+  have gx := hx; apply a at hx; apply b at gx; simp only [ball, shell, Set.mem_setOf_eq] at hx gx
   cases hd : G.edist x v with
-  | top => rw [hd] at h; contradiction
-  | coe d => rw [hd] at h g; norm_cast at h g; simp [g] at h
+  | top => rw [hd] at hx; contradiction
+  | coe => rw [hd] at hx gx; norm_cast at hx gx; rw [gx, ←not_lt] at hx; contradiction
 
-noncomputable instance [G.LocallyFinite] (r : Nat) (v : V) : Fintype (sphere G r v) := by
+noncomputable instance [G.LocallyFinite] : Fintype (shell G r v) := by
   apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (by ball!)
-  rw [ball, sphere, Set.setOf_subset_setOf]; intros; simp [*]
+  rw [ball, shell, Set.setOf_subset_setOf]; intros; simp [*]
 
-macro "sphere!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
-  ball_sphere_disjoint,
+macro "shell!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
+  ball_shell_disjoint,
   ball_nonempty, ball_subset,
-  Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
-  Pi.le_def, one_le_div, pos_of_ne_zero, div_le_div_iff_of_pos_right,
-  div_le_div_of_nonneg_left, div_le_one,
+  Set.toFinite, Set.ncard_le_ncard, Set.Nonempty.ne_empty,
+  pos_of_ne_zero,
   $h,*
 ])
-macro "sphere!" : tactic => `(tactic| sphere! [])
+macro "shell!" : tactic => `(tactic| shell! [])
 
 ----------------------------------------------------------------------------------------------------
 
@@ -122,11 +114,10 @@ theorem utball_nonempty : (utball τ r v).Nonempty := by
 
 theorem utball_subset (h : r₁ ≤ r₂) : utball τ r₁ v ⊆ utball τ r₂ v := by
   intro x hx; simp only [utball, ball,
-    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at *
+    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at ⊢ hx
   obtain ⟨y, hy₁, hy₂⟩ := hx; exists y; apply And.intro hy₁; apply le_trans (b := ↑r₁) <;> simp [*]
 
-theorem utball_lower {G : SimpleGraph V} {τ : Tiling G}
-  : ball G r v ⊆ utball τ r v := by
+theorem utball_lower {G : SimpleGraph V} {τ : Tiling G} : ball G r v ⊆ utball τ r v := by
   simp only [ball, utball, Set.mem_setOf_eq, Set.iUnion_exists]; intro x h; aesop
 
 theorem utball_upper {G : SimpleGraph V} {τ : Tiling G}
@@ -135,11 +126,11 @@ theorem utball_upper {G : SimpleGraph V} {τ : Tiling G}
   obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
   simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₂
   rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v)
-  · apply SimpleGraph.edist_triangle
-  · rw [add_comm]; apply add_le_add <;> assumption
+  · exact SimpleGraph.edist_triangle
+  · rw [add_comm]; exact add_le_add h₂ h₁
 
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (ball G _ v).toFinite utball_upper
+  apply Set.Finite.fintype; exact Set.Finite.subset (ball G _ v).toFinite utball_upper
 
 macro "utball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   utball_nonempty, utball_subset, utball_lower, utball_upper,
@@ -152,21 +143,32 @@ macro "utball!" : tactic => `(tactic| utball! [])
 
 ----------------------------------------------------------------------------------------------------
 
--- theorem ltball_subset
+theorem ltball_subset (h : r₁ ≤ r₂) : ltball τ r₁ v ⊆ ltball τ r₂ v := by
+  intro x hx; simp only [ltball, ball,
+    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at ⊢ hx
+  intro u hu; rw [←ENat.coe_le_coe] at h; apply le_trans _ h; apply hx _ hu
 
-theorem ltball_lower {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
+theorem ltball_lower {G : SimpleGraph V} {τ : Tiling G}
   : ball G r v ⊆ ltball τ (r + τ.d) v := fun p h ↦ by
   simp only [ball, ltball, Set.mem_setOf_eq] at ⊢ h
   simp only [Set.mem_setOf_eq, Nat.cast_add, Set.mem_iUnion, exists_prop, exists_eq_right']
   intro x hx; apply τ.h₂ at hx; apply le_trans (b := G.edist x p + G.edist p v)
-  · apply SimpleGraph.edist_triangle
-  · rw [add_comm]; apply add_le_add <;> assumption
+  · exact SimpleGraph.edist_triangle
+  · rw [add_comm]; exact add_le_add h hx
 
-theorem ltball_upper {G : SimpleGraph V} (τ : Tiling G) (r : Nat) (v : V)
+theorem ltball_upper {G : SimpleGraph V} {τ : Tiling G}
   : ltball τ r v ⊆ ball G r v := by simp [ltball, ball]
 
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (ltball τ r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (ball G r v).toFinite (ltball_upper _ _ _)
+  apply Set.Finite.fintype; apply Set.Finite.subset (ball G r v).toFinite ltball_upper
+
+macro "ltball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
+  ltball_subset, ltball_lower, ltball_upper,
+  ball_nonempty, ball_subset,
+  Set.toFinite,
+  $h,*
+])
+macro "ltball!" : tactic => `(tactic| ltball! [])
 
 ----------------------------------------------------------------------------------------------------
 
@@ -180,7 +182,7 @@ def slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] (τ : Tiling G) (v : V)
   Filter.atTop (nhds 1)
 
 def slow_boundary_at [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
-  (fun r ↦ ((sphere G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
+  (fun r ↦ ((shell G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
 
 structure Policy (V : Type*) where
@@ -264,25 +266,25 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
     constructor <;> rw [slow_growth_at, slow_boundary_at] <;> intro h
     · conv =>
         arg 1; ext r
-        rw [←add_assoc, sphere_eq_ball_sub, Set.ncard_diff (by ball!) (by ball!)]
+        rw [←add_assoc, shell_eq_ball_sub, Set.ncard_diff (by ball!) (by ball!)]
         rw [Nat.cast_sub (by ball!), sub_div, add_assoc]
       rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
       cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
       rw [slow_growth_at_ext (e₁ + 1 + 1)]; exact h
     · conv =>
         arg 1; ext r
-        rw [←add_assoc, ball_eq_ball_sphere, Set.ncard_union_eq (by sphere!), Nat.cast_add, add_div]
+        rw [←add_assoc, ball_eq_ball_shell, Set.ncard_union_eq (by shell!), Nat.cast_add, add_div]
       conv => arg 3; rw [←add_zero 1]
       apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
       cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
       rw [slow_growth_at_iff_slow_boundary_at v (e₁ + 1) 0 (by omega)]
       have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
         (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def, div_nonneg])
-        (f := fun r ↦ ↑(sphere G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
-        (by simp_rw [←add_assoc, Pi.le_def]; intro r; apply div_le_div_of_nonneg_left <;> sphere!)
+        (f := fun r ↦ ↑(shell G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
+        (by simp_rw [←add_assoc, Pi.le_def]; intro r; apply div_le_div_of_nonneg_left <;> shell!)
       simp_rw [show ∀ r : Nat, r + e₁ + 1 + 1 = r + 1 + e₁ + 1 by intro; ring] at t
       rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
-        (f := fun r ↦ ↑(sphere G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
+        (f := fun r ↦ ↑(shell G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
       exact t
 
 theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
