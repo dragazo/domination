@@ -20,17 +20,17 @@ theorem ball_subset (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
 theorem ball_eq_union_ball : (ball G (r + 1) v) = ⋃ u ∈ N[G, v], ball G r u := by
   ext x; constructor <;> simp only [ball, Set.mem_setOf_eq, Set.mem_insert_iff,
     Set.iUnion_iUnion_eq_or_left, Set.mem_union, Set.mem_iUnion] <;> intro h
-  · rw [SimpleGraph.edist_comm] at h
-    have ⟨Wvx, Lvx⟩ := SimpleGraph.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) h)
+  · rw [G.edist_comm] at h
+    have ⟨Wvx, Lvx⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) h)
     cases Wvx with | nil => simp | @cons v w x Avw Wwx => exact Or.inr ⟨w, Avw, by
     rw [SimpleGraph.Walk.length_cons] at Lvx
     rw [←Lvx, ENat.coe_le_coe, Nat.add_le_add_iff_right, ←ENat.coe_le_coe] at h
-    exact le_trans (SimpleGraph.edist_comm ▸ (SimpleGraph.edist_le Wwx)) h⟩
+    exact le_trans (G.edist_comm ▸ (G.edist_le Wwx)) h⟩
   · rw [Nat.cast_add]; match h with
     | Or.inl h => exact le_trans h le_self_add | Or.inr ⟨i, Avi, Dxi⟩ =>
-    apply le_trans (b := G.edist x i + G.edist i v) SimpleGraph.edist_triangle
+    apply le_trans (b := G.edist x i + G.edist i v) G.edist_triangle
     apply add_le_add Dxi
-    rw [SimpleGraph.edist_comm, SimpleGraph.edist_eq_one_iff_adj.mpr Avi, Nat.cast_one]
+    rw [G.edist_comm, G.edist_eq_one_iff_adj.mpr Avi, Nat.cast_one]
 
 noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
   apply Set.Finite.fintype; induction r generalizing v with | zero => simp [ball] | succ r ih =>
@@ -126,11 +126,29 @@ theorem utball_upper {G : SimpleGraph V} {τ : Tiling G}
   obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
   simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₂
   rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v)
-  · exact SimpleGraph.edist_triangle
+  · exact G.edist_triangle
   · rw [add_comm]; exact add_le_add h₂ h₁
 
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r v) := by
   apply Set.Finite.fintype; exact Set.Finite.subset (ball G _ v).toFinite utball_upper
+
+theorem utball_eq_union_utball {G : SimpleGraph V} {τ : Tiling G}
+  : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
+  ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
+    Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
+    forall_exists_index, and_imp]
+  · intro y τxy yvd; rw [G.edist_comm] at yvd
+    have ⟨vy, vyd⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) yvd)
+    cases vy with
+    | nil => exists v; apply And.intro (by simp); exists v; simp [τxy]
+    | @cons v w x vw wy =>
+      exists w; apply And.intro (by rw [G.adj_comm] at vw; simp [G.edist_le_one_iff_adj_or_eq, vw])
+      exists y; apply And.intro τxy; rw [SimpleGraph.Walk.length_cons] at vyd
+      rw [←ENat.add_le_add_iff_right (k := 1) (by decide)]; apply le_trans _ yvd
+      rw [←vyd, Nat.cast_add, ENat.coe_one, ENat.add_le_add_iff_right (by decide), G.edist_comm]
+      apply SimpleGraph.Walk.edist_le
+  · intro y yvd z τxz zyd; exists z; apply And.intro τxz
+    exact le_trans (b := G.edist z y + G.edist y v) G.edist_triangle (add_le_add zyd yvd)
 
 macro "utball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   utball_nonempty, utball_subset, utball_lower, utball_upper,
