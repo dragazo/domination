@@ -3,21 +3,6 @@ import Domination.General
 
 ----------------------------------------------------------------------------------------------------
 
-structure Tiling (G : SimpleGraph V) where
-  t : Type*
-  f : V → t
-  n : Nat
-  d : Nat
-  n₀ : n ≠ 0 := by norm_num
-  d₀ : d ≠ 0 := by norm_num
-  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
-  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
-
-def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
-
-noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
-
 structure Policy (V : Type*) where
   f : V → Real
   m : Real := 1
@@ -30,6 +15,21 @@ noncomputable def Policy.set (S : Set V) : Policy V := {
 }
 
 ----------------------------------------------------------------------------------------------------
+
+structure Tiling (G : SimpleGraph V) where
+  t : Type*
+  f : V → t
+  n : Nat
+  d : Nat
+  n₀ : n ≠ 0 := by norm_num
+  d₀ : d ≠ 0 := by norm_num
+  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
+  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
+
+noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
+
+def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
 def Tiling.closure {G : SimpleGraph V} (τ : Tiling G) (S : Set V) : Set V :=
   ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ S}, {x | τ.f x = t}
