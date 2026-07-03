@@ -14,8 +14,6 @@ noncomputable def Policy.set (S : Set V) : Policy V := {
   f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
 }
 
-----------------------------------------------------------------------------------------------------
-
 structure Tiling (G : SimpleGraph V) where
   t : Type*
   f : V → t
@@ -29,48 +27,50 @@ structure Tiling (G : SimpleGraph V) where
 noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
+----------------------------------------------------------------------------------------------------
+
+variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
+
 def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
-def Tiling.closure {G : SimpleGraph V} (τ : Tiling G) (S : Set V) : Set V :=
+def Tiling.closure (τ : Tiling G) (S : Set V) : Set V :=
   ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ S}, {x | τ.f x = t}
 
-@[simp] theorem Tiling.closure_idemp {τ : Tiling G} : τ.closure (τ.closure S) = τ.closure S := by
+@[simp] theorem Tiling.id_closure : (Tiling.id G).closure S = S := by
+  ext x; simp [closure, id]; tauto
+
+@[simp] theorem Tiling.closure_idemp : τ.closure (τ.closure S) = τ.closure S := by
   ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
     exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
   · intro y hy z hz h; exists z; rw [hz, hy]; simp [h]
   · intro y hy h; exists y; apply And.intro hy; exists y
 
-theorem Tiling.subset_closure {τ : Tiling G} : S ⊆ τ.closure S := by
+theorem Tiling.subset_closure : S ⊆ τ.closure S := by
   intro x hx; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
     exists_and_right, exists_eq_right']; exists x
 
-theorem Tiling.closure_mono {τ : Tiling G} (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure S₂ := by
+theorem Tiling.closure_mono (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure S₂ := by
   intro x; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
     exists_and_right, exists_eq_right']; intro ⟨y, hy₁, hy₂⟩; exists y; simp [hy₁, h hy₂]
 
-@[simp] theorem Tiling.union_closure_eq {G : SimpleGraph V} {τ : Tiling G}
-  {S : Set V} {f : V → Set V} : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
+@[simp] theorem Tiling.union_closure_eq {f : V → Set V}
+  : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
   ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
     exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
   <;> (intro y hy z hz₁ hz₂; exists z; apply And.intro hz₁; exists y)
 
 ----------------------------------------------------------------------------------------------------
 
-variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
-
 def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
 def cball (τ : Tiling G) (r : Nat) (v : V) := τ.closure (ball G r v)
 
+----------------------------------------------------------------------------------------------------
+
 @[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
   ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
   exact G.edist_le_one_iff_adj_or_eq
-
-@[simp] theorem Tiling.id.cball_eq : cball (Tiling.id G) r v = ball G r v := by
-  rw [cball, ball, closure]; aesop
-
-----------------------------------------------------------------------------------------------------
 
 theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u := by
   ext x; constructor <;> simp only [ball, Nat.cast_add, Nat.cast_one, Set.mem_setOf_eq,
