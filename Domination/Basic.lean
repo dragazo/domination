@@ -31,31 +31,82 @@ noncomputable def Policy.set (S : Set V) : Policy V := {
 
 ----------------------------------------------------------------------------------------------------
 
+def Tiling.up {G : SimpleGraph V} (τ : Tiling G) (S : Set V) : Set V :=
+  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ S}, {x | τ.f x = t}
+def Tiling.down {G : SimpleGraph V} (τ : Tiling G) (S : Set V) : Set V :=
+  ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ S}, {x | τ.f x = t}
+
+@[simp] theorem Tiling.up_up_eq : Tiling.up τ (Tiling.up τ S) = Tiling.up τ S := by
+  ext x; constructor <;> simp only [up, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
+    exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
+  · intro y hy z hz h; exists z; rw [hz, hy]; simp [h]
+  · intro y hy h; exists y; apply And.intro hy; exists y
+
+@[simp] theorem Tiling.up_down_eq : Tiling.up τ (Tiling.down τ S) = Tiling.down τ S := by
+  ext x; constructor <;> simp only [up, Set.mem_setOf_eq, down, Set.mem_iUnion, exists_prop,
+    exists_eq_right', Set.iUnion_exists, exists_and_right, forall_exists_index, and_imp]
+  · intro y hy h z hz; apply h; rw [hz, hy]
+  · intro h; exists x
+
+@[simp] theorem Tiling.down_up_eq : Tiling.down τ (Tiling.up τ S) = Tiling.up τ S := by
+  ext x; constructor <;> simp only [down, Set.mem_setOf_eq, up, Set.iUnion_exists, Set.mem_iUnion,
+    exists_prop, exists_and_right, exists_eq_right']
+  · intro h; apply h; rfl
+  · intro h y hy; obtain ⟨z, hz₁, hz₂⟩ := h; exists z; simp [*]
+
+@[simp] theorem Tiling.down_down_eq : Tiling.down τ (Tiling.down τ S) = Tiling.down τ S := by
+  ext x; constructor <;> simp only [down, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
+    exists_eq_right']
+  · intro h y hy; apply h y hy; rfl
+  · intro h y hy z hz; simp [*]
+
+theorem Tiling.down_subset : Tiling.down τ S ⊆ S := by
+  intro x hx; simp only [down, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
+    exists_eq_right'] at hx; exact hx _ rfl
+
+theorem Tiling.subset_up : S ⊆ Tiling.up τ S := by
+  intro x hx; simp only [up, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
+    exists_and_right, exists_eq_right']; exists x
+
+theorem Tiling.up_mono (h : S₁ ⊆ S₂) : Tiling.up τ S₁ ⊆ Tiling.up τ S₂ := by
+  intro x; simp only [up, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
+    exists_and_right, exists_eq_right']; intro ⟨y, hy₁, hy₂⟩; exists y; simp [hy₁, h hy₂]
+
+theorem Tiling.down_mono (h : S₁ ⊆ S₂) : Tiling.down τ S₁ ⊆ Tiling.down τ S₂ := by
+  intro x; simp only [down, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right']
+  intro h' y hy; exact h (h' _ hy)
+
+@[simp] theorem Tiling.union_up_eq {S : Set V} {f : V → Set V}
+  : ⋃ x ∈ S, Tiling.up τ (f x) = Tiling.up τ (⋃ x ∈ S, f x) := by
+  ext x; constructor <;> simp only [up, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
+    exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
+  <;> (intro y hy z hz₁ hz₂; exists z; apply And.intro hz₁; exists y)
+
+----------------------------------------------------------------------------------------------------
+
 variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
 
 def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
-def utball (τ : Tiling G) (r : Nat) (v : V) :=
-  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
-def ltball (τ : Tiling G) (r : Nat) (v : V) :=
-  ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
+def utball (τ : Tiling G) (r : Nat) (v : V) := τ.up (ball G r v)
+def ltball (τ : Tiling G) (r : Nat) (v : V) := τ.down (ball G r v)
 
 @[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
   ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
   exact G.edist_le_one_iff_adj_or_eq
 
 @[simp] theorem Tiling.id.utball_eq : utball (Tiling.id G) r v = ball G r v := by
-  rw [utball, ball]; aesop
+  rw [utball, ball, up]; aesop
 @[simp] theorem Tiling.id.ltball_eq : ltball (Tiling.id G) r v = ball G r v := by
-  rw [ltball, ball]; aesop
+  rw [ltball, ball, down]; aesop
 
 ----------------------------------------------------------------------------------------------------
 
 theorem utball_eq_union_utball : utball τ (r + 1) v = ⋃ u ∈ ball G 1 v, utball τ r u := by
   ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
     Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
-    forall_exists_index, and_imp]
+    forall_exists_index, and_imp, Tiling.up]
   · intro y τxy yvd; rw [G.edist_comm] at yvd
     have ⟨vy, vyd⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) yvd)
     cases vy with
@@ -73,6 +124,8 @@ theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u
   rw [←Tiling.id.utball_eq]; conv_rhs => rhs; ext u; rhs; ext h; rw [←Tiling.id.utball_eq]
   exact utball_eq_union_utball
 
+
+
 theorem ball_nonempty : (ball G r v).Nonempty := by
   apply Set.nonempty_of_mem (x := v); simp [ball]
 
@@ -86,22 +139,25 @@ noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
 
 ----------------------------------------------------------------------------------------------------
 
+theorem utball_eq_union_utball : utball τ (r + 1) v = ⋃ u ∈ ball G 1 v, utball τ r u := by
+  unfold utball; rw [τ.union_up_eq]; congr; exact ball_eq_union_ball
+
 theorem utball_nonempty : (utball τ r v).Nonempty := by
   apply Set.nonempty_of_mem (x := v)
-  simp only [utball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right']
+  simp only [utball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right', Tiling.up]
   exists v; simp [ball]
 
 theorem utball_subset (h : r₁ ≤ r₂) : utball τ r₁ v ⊆ utball τ r₂ v := by
   intro x hx; simp only [utball, ball,
-    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at ⊢ hx
+    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right', Tiling.up] at ⊢ hx
   obtain ⟨y, hy₁, hy₂⟩ := hx; exists y; apply And.intro hy₁; apply le_trans (b := ↑r₁) <;> simp [*]
 
 theorem utball_lower {G : SimpleGraph V} {τ : Tiling G} : ball G r v ⊆ utball τ r v := by
-  simp only [ball, utball, Set.mem_setOf_eq, Set.iUnion_exists]; intro x h; aesop
+  simp only [ball, utball, Set.mem_setOf_eq, Set.iUnion_exists, Tiling.up]; intro x h; aesop
 
-theorem utball_upper {G : SimpleGraph V} {τ : Tiling G}
-  : utball τ r v ⊆ ball G (r + τ.d) v := fun p h ↦ by
-  simp only [utball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at h
+theorem utball_upper {G : SimpleGraph V} {τ : Tiling G} : utball τ r v ⊆ ball G (r + τ.d) v := by
+  intro p h; simp only [utball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
+    exists_eq_right', Tiling.up] at h
   obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
   simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₂
   rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v)
@@ -115,19 +171,20 @@ noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (utball τ r 
 
 theorem ltball_subset (h : r₁ ≤ r₂) : ltball τ r₁ v ⊆ ltball τ r₂ v := by
   intro x hx; simp only [ltball, ball,
-    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right'] at ⊢ hx
+    Set.mem_setOf_eq, Set.mem_iUnion, exists_prop, exists_eq_right', Tiling.down] at ⊢ hx
   intro u hu; rw [←ENat.coe_le_coe] at h; apply le_trans _ h; apply hx _ hu
 
 theorem ltball_lower {G : SimpleGraph V} {τ : Tiling G}
   : ball G r v ⊆ ltball τ (r + τ.d) v := fun p h ↦ by
   simp only [ball, ltball, Set.mem_setOf_eq] at ⊢ h
-  simp only [Set.mem_setOf_eq, Nat.cast_add, Set.mem_iUnion, exists_prop, exists_eq_right']
+  simp only [Set.mem_setOf_eq, Nat.cast_add, Set.mem_iUnion, exists_prop,
+    exists_eq_right', Tiling.down]
   intro x hx; apply τ.h₂ at hx; apply le_trans (b := G.edist x p + G.edist p v)
   · exact SimpleGraph.edist_triangle
   · rw [add_comm]; exact add_le_add h hx
 
 theorem ltball_upper {G : SimpleGraph V} {τ : Tiling G}
-  : ltball τ r v ⊆ ball G r v := by simp [ltball, ball]
+  : ltball τ r v ⊆ ball G r v := by simp [ltball, ball, Tiling.down]
 
 theorem ltball_nonempty (h : τ.d ≤ r) : (ltball τ r v).Nonempty := by
   have ⟨k, hr⟩ := Nat.exists_eq_add_of_le h; rw [hr, add_comm]
