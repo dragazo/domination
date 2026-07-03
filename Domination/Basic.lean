@@ -41,7 +41,7 @@ def utball (τ : Tiling G) (r : Nat) (v : V) :=
 def ltball (τ : Tiling G) (r : Nat) (v : V) :=
   ⋃ t ∈ {t | ∀ u ∈ {x | τ.f x = t}, u ∈ ball G r v}, {x | τ.f x = t}
 
-@[simp] theorem ball₁ : (ball G 1 v) = insert v (G.neighborSet v) := by
+@[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
   ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
   exact G.edist_le_one_iff_adj_or_eq
 
@@ -52,7 +52,7 @@ def ltball (τ : Tiling G) (r : Nat) (v : V) :=
 
 ----------------------------------------------------------------------------------------------------
 
-theorem utball_eq_union_utball : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, utball τ r u := by
+theorem utball_eq_union_utball : utball τ (r + 1) v = ⋃ u ∈ ball G 1 v, utball τ r u := by
   ext x; constructor <;> simp only [utball, Set.mem_setOf_eq, ball, Nat.cast_add, Nat.cast_one,
     Set.iUnion_exists, Set.mem_iUnion, exists_prop, exists_and_right, exists_eq_right',
     forall_exists_index, and_imp]
@@ -69,7 +69,7 @@ theorem utball_eq_union_utball : (utball τ (r + 1) v) = ⋃ u ∈ ball G 1 v, u
   · intro y yvd z τxz zyd; exists z; apply And.intro τxz
     exact le_trans (b := G.edist z y + G.edist y v) G.edist_triangle (add_le_add zyd yvd)
 
-theorem ball_eq_union_ball : (ball G (r + 1) v) = ⋃ u ∈ ball G 1 v, ball G r u := by
+theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u := by
   rw [←Tiling.id.utball_eq]; conv_rhs => rhs; ext u; rhs; ext h; rw [←Tiling.id.utball_eq]
   exact utball_eq_union_utball
 
@@ -129,16 +129,20 @@ theorem ltball_lower {G : SimpleGraph V} {τ : Tiling G}
 theorem ltball_upper {G : SimpleGraph V} {τ : Tiling G}
   : ltball τ r v ⊆ ball G r v := by simp [ltball, ball]
 
+theorem ltball_nonempty (h : τ.d ≤ r) : (ltball τ r v).Nonempty := by
+  have ⟨k, hr⟩ := Nat.exists_eq_add_of_le h; rw [hr, add_comm]
+  apply Set.Nonempty.mono (s := ball G k v) ltball_lower ball_nonempty
+
 noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (ltball τ r v) := by
   apply Set.Finite.fintype; apply Set.Finite.subset (ball G r v).toFinite ltball_upper
 
 ----------------------------------------------------------------------------------------------------
 
-theorem ball_eq_ball_shell : (ball G (r + 1) v) = (ball G r v) ∪ (shell G (r + 1) v) := by
+theorem ball_eq_ball_shell : ball G (r + 1) v = ball G r v ∪ shell G (r + 1) v := by
   ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_union]
   cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
 
-theorem shell_eq_ball_sub : shell G (r + 1) v = (ball G (r + 1) v) \ (ball G r v) := by
+theorem shell_eq_ball_sub : shell G (r + 1) v = ball G (r + 1) v \ ball G r v := by
   ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_diff]
   cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
 
@@ -159,7 +163,7 @@ noncomputable instance [G.LocallyFinite] : Fintype (shell G r v) := by
 macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   ball_nonempty, ball_subset,
   utball_nonempty, utball_subset, utball_lower, utball_upper,
-  ltball_subset, ltball_lower, ltball_upper,
+  ltball_nonempty, ltball_subset, ltball_lower, ltball_upper,
   ball_shell_disjoint,
   Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
   Pi.le_def, one_le_div, div_le_one, div_le_div_iff_of_pos_right,
