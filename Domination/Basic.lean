@@ -53,6 +53,18 @@ theorem Tiling.closure_mono (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure
   intro x; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
     exists_and_right, exists_eq_right']; intro ⟨y, hy₁, hy₂⟩; exists y; simp [hy₁, h hy₂]
 
+theorem Tiling.closure_nonempty (h : S.Nonempty) : (τ.closure S).Nonempty := by
+  exact Set.Nonempty.mono (s := S) τ.subset_closure h
+
+noncomputable instance [Fintype S] : Fintype (τ.closure S) := by
+  apply Set.Finite.fintype; unfold Tiling.closure; apply Set.Finite.biUnion
+  · simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
+    · intro u h; rw [Set.setOf_and]; apply Set.Finite.inter_of_left
+      conv => arg 1; arg 1; ext x; rw [eq_comm]
+      rw [Set.setOf_eq_eq_singleton]; exact Set.toFinite _
+    · intro u h; simp [h]
+  · intro t ht; exact Set.toFinite _
+
 @[simp] theorem Tiling.union_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
   ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
@@ -101,19 +113,13 @@ noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
 theorem cball_eq_union_cball : cball τ (r + 1) v = ⋃ u ∈ ball G 1 v, cball τ r u := by
   unfold cball; rw [τ.union_closure_eq]; congr; exact ball_eq_union_ball
 
-theorem cball_nonempty : (cball τ r v).Nonempty := by
-  apply Set.nonempty_of_mem (x := v); simp only [cball, Set.mem_setOf_eq, Set.mem_iUnion,
-    exists_prop, exists_eq_right', Tiling.closure]; exists v; simp [ball]
+theorem cball_nonempty : (cball τ r v).Nonempty := τ.closure_nonempty ball_nonempty
 
-theorem cball_subset (h : r₁ ≤ r₂) : cball τ r₁ v ⊆ cball τ r₂ v := by
-  intro x hx; simp only [cball, ball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
-    exists_eq_right', Tiling.closure] at ⊢ hx
-  obtain ⟨y, hy₁, hy₂⟩ := hx; exists y; apply And.intro hy₁; apply le_trans (b := ↑r₁) <;> simp [*]
+theorem cball_subset (h : r₁ ≤ r₂) : cball τ r₁ v ⊆ cball τ r₂ v := τ.closure_mono (ball_subset h)
 
-theorem cball_lower {G : SimpleGraph V} {τ : Tiling G} : ball G r v ⊆ cball τ r v := by
-  simp only [ball, cball, Set.mem_setOf_eq, Set.iUnion_exists, Tiling.closure]; intro x h; aesop
+theorem cball_lower : ball G r v ⊆ cball τ r v := τ.subset_closure
 
-theorem cball_upper {G : SimpleGraph V} {τ : Tiling G} : cball τ r v ⊆ ball G (r + τ.d) v := by
+theorem cball_upper : cball τ r v ⊆ ball G (r + τ.d) v := by
   intro p h; simp only [cball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
     exists_eq_right', Tiling.closure] at h
   obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
@@ -300,7 +306,7 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
   · conv_rhs => rw [←mul_one π.m, ←mul_div_cancel₀ ε (ne_of_lt π.hm).symm, ←mul_add]
     apply mul_le_mul_of_nonneg_left _ (le_of_lt π.hm); exact q
 
-@[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype ↑s]
+@[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype s]
   : ∑ x ∈ s, (Policy.set S).f x = (s ∩ S).ncard := by simp [Policy.set, ←Set.ncard_coe_finset]
 
 theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
@@ -391,7 +397,7 @@ theorem slow_tiling_at_ext {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
     rw [←helper e₁ 0 (by omega)]; unfold slow_tiling_at; constructor <;> intro h
     · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> ball!
     · conv =>
-        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(cball τ (r + 1) v).ncard) (by ball!)]
+        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(cball τ (r + 1) v).ncard) (by ball! [])]
       conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
       apply Filter.Tendsto.mul
       · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
