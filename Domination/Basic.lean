@@ -10,10 +10,6 @@ structure Policy (V : Type*) where
   f₀ : ∀ r, 0 ≤ f r := by aesop
   fₘ : ∀ r, f r ≤ m := by aesop
 
-noncomputable def Policy.set (S : Set V) : Policy V := {
-  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
-}
-
 structure Tiling (G : SimpleGraph V) where
   t : Type*
   f : V → t
@@ -24,12 +20,16 @@ structure Tiling (G : SimpleGraph V) where
   h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
-noncomputable instance Tiling.fintype (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
+
+noncomputable def Policy.set (S : Set V) : Policy V := {
+  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
+}
+
+noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
 ----------------------------------------------------------------------------------------------------
-
-variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
@@ -65,7 +65,7 @@ noncomputable instance Tiling.closure_fintype [Fintype S] : Fintype (τ.closure 
     · intro u h; simp [h]
   · intro t ht; exact Set.toFinite _
 
-@[simp] theorem Tiling.union_closure_eq {f : V → Set V}
+@[simp] theorem Tiling.biUnion_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
   ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
     exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
@@ -111,7 +111,7 @@ noncomputable instance ball_fintype [G.LocallyFinite] : Fintype (ball G r v) := 
 ----------------------------------------------------------------------------------------------------
 
 theorem cball_eq_union_cball : cball τ (r + 1) v = ⋃ u ∈ ball G 1 v, cball τ r u := by
-  unfold cball; rw [τ.union_closure_eq, ball_eq_union_ball]
+  unfold cball; rw [τ.biUnion_closure_eq, ball_eq_union_ball]
 
 theorem cball_nonempty : (cball τ r v).Nonempty := τ.closure_nonempty ball_nonempty
 
@@ -124,12 +124,10 @@ theorem cball_upper : cball τ r v ⊆ ball G (r + τ.d) v := by
     exists_eq_right', Tiling.closure] at h
   obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
   simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₂
-  rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v)
-  · exact G.edist_triangle
-  · rw [add_comm]; exact add_le_add h₂ h₁
+  rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v) G.edist_triangle
+  rw [add_comm]; exact add_le_add h₂ h₁
 
-noncomputable instance cball_fintype [G.LocallyFinite] (τ : Tiling G) : Fintype (cball τ r v) :=
-  τ.closure_fintype
+noncomputable instance cball_fintype [G.LocallyFinite] : Fintype (cball τ r v) := τ.closure_fintype
 
 ----------------------------------------------------------------------------------------------------
 
