@@ -24,7 +24,7 @@ structure Tiling (G : SimpleGraph V) where
   h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
-noncomputable instance (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
+noncomputable instance Tiling.fintype (τ : Tiling G) (t : τ.t) : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
 ----------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ theorem Tiling.closure_mono (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure
 theorem Tiling.closure_nonempty (h : S.Nonempty) : (τ.closure S).Nonempty := by
   exact Set.Nonempty.mono (s := S) τ.subset_closure h
 
-noncomputable instance [Fintype S] : Fintype (τ.closure S) := by
+noncomputable instance Tiling.closure_fintype [Fintype S] : Fintype (τ.closure S) := by
   apply Set.Finite.fintype; unfold Tiling.closure; apply Set.Finite.biUnion
   · simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
     · intro u h; rw [Set.setOf_and]; apply Set.Finite.inter_of_left
@@ -100,10 +100,10 @@ theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u
 theorem ball_nonempty : (ball G r v).Nonempty := by
   apply Set.nonempty_of_mem (x := v); simp [ball]
 
-theorem ball_subset (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
+theorem ball_mono (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
   intro x hx; rw [ball, Set.mem_setOf_eq] at ⊢ hx; apply le_trans hx; simp [h]
 
-noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
+noncomputable instance ball_fintype [G.LocallyFinite] : Fintype (ball G r v) := by
   apply Set.Finite.fintype; induction r generalizing v with | zero => simp [ball] | succ r ih =>
   rw [ball_eq_union_ball]; apply Set.Finite.biUnion
     (by rw [ball₁]; exact Set.finite_insert.mpr (Set.toFinite _)) (fun _ _ ↦ ih)
@@ -111,11 +111,11 @@ noncomputable instance [G.LocallyFinite] : Fintype (ball G r v) := by
 ----------------------------------------------------------------------------------------------------
 
 theorem cball_eq_union_cball : cball τ (r + 1) v = ⋃ u ∈ ball G 1 v, cball τ r u := by
-  unfold cball; rw [τ.union_closure_eq]; congr; exact ball_eq_union_ball
+  unfold cball; rw [τ.union_closure_eq, ball_eq_union_ball]
 
 theorem cball_nonempty : (cball τ r v).Nonempty := τ.closure_nonempty ball_nonempty
 
-theorem cball_subset (h : r₁ ≤ r₂) : cball τ r₁ v ⊆ cball τ r₂ v := τ.closure_mono (ball_subset h)
+theorem cball_mono (h : r₁ ≤ r₂) : cball τ r₁ v ⊆ cball τ r₂ v := τ.closure_mono (ball_mono h)
 
 theorem cball_lower : ball G r v ⊆ cball τ r v := τ.subset_closure
 
@@ -128,8 +128,8 @@ theorem cball_upper : cball τ r v ⊆ ball G (r + τ.d) v := by
   · exact G.edist_triangle
   · rw [add_comm]; exact add_le_add h₂ h₁
 
-noncomputable instance [G.LocallyFinite] (τ : Tiling G) : Fintype (cball τ r v) := by
-  apply Set.Finite.fintype; exact Set.Finite.subset (ball G _ v).toFinite cball_upper
+noncomputable instance cball_fintype [G.LocallyFinite] (τ : Tiling G) : Fintype (cball τ r v) :=
+  τ.closure_fintype
 
 ----------------------------------------------------------------------------------------------------
 
@@ -149,15 +149,15 @@ theorem ball_shell_disjoint (h : r₁ < r₂) : Disjoint (ball G r₁ v) (shell 
   | top => rw [hd] at hx; contradiction
   | coe => rw [hd] at hx gx; norm_cast at hx gx; rw [gx, ←not_lt] at hx; contradiction
 
-noncomputable instance [G.LocallyFinite] : Fintype (shell G r v) := by
+noncomputable instance shell_fintype [G.LocallyFinite] : Fintype (shell G r v) := by
   apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (Set.toFinite _)
   rw [ball, shell, Set.setOf_subset_setOf]; intros; simp [*]
 
 ----------------------------------------------------------------------------------------------------
 
 macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
-  ball_nonempty, ball_subset,
-  cball_nonempty, cball_subset, cball_lower, cball_upper,
+  ball_nonempty, ball_mono,
+  cball_nonempty, cball_mono, cball_lower, cball_upper,
   ball_shell_disjoint,
   Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
   Pi.le_def, one_le_div, div_le_one, div_le_div_iff_of_pos_right,
