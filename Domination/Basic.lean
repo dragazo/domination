@@ -165,37 +165,43 @@ macro "ball!" : tactic => `(tactic| ball! [])
 
 ----------------------------------------------------------------------------------------------------
 
-def slow_growth_at (G : SimpleGraph V) [G.LocallyFinite] (v : V) (e₁ := 1) (e₂ := 0) :=
-  Filter.Tendsto
+def slow_growth_at (G : SimpleGraph V) (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-def slow_tiling_at [G.LocallyFinite] (τ : Tiling G) (v : V) (e₁ := 1) (e₂ := 0) :=
-  Filter.Tendsto
+def slow_tiling_at (τ : Tiling G) (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
   (fun r ↦ ((cball τ (r + e₁) v).ncard : Real) / ((cball τ (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-def slow_boundary_at (G : SimpleGraph V) [G.LocallyFinite] (v : V) (e₁ e₂ : Nat := 0) :=
-  Filter.Tendsto
+def slow_boundary_at (G : SimpleGraph V) (v : V) (e₁ e₂ : Nat := 0) := Filter.Tendsto
   (fun r ↦ ((shell G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 0)
+
+----------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------
 
 def ufdensity_at (G : SimpleGraph V) [G.LocallyFinite]
   (π : Policy V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (ball G (r + e₁) v), π.f x) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
-def utufdensity_at [G.LocallyFinite] (τ : Tiling G)
+def utufdensity_at (τ : Tiling G) [G.LocallyFinite]
   (π : Policy V) (v : V) (d : Real) (e₁ e₂ : Nat := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (cball τ (r + e₁) v), π.f x) / (cball τ (r + e₂) v).ncard) Filter.atTop = d
 
-def udensity_at (G : SimpleGraph V) [G.LocallyFinite]
+def udensity_at (G : SimpleGraph V)
   (S : Set V) (v : V) (d : Real) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (((ball G (r + e₁) v) ∩ S).ncard : Real) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
 ----------------------------------------------------------------------------------------------------
 
 -- todo: refractor this to use the tiling ext theorem with a unit tile
-theorem slow_growth_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
+theorem slow_growth_at_ext [G.LocallyFinite]
   (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
   : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
@@ -222,7 +228,7 @@ theorem slow_growth_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat}
     rw [←helper e₂ e₁ (by omega)]; constructor <;> apply t
   rw [assistant h₁₂, assistant h₃₄]
 
-theorem slow_growth_at_reach {G : SimpleGraph V} [G.LocallyFinite] {u v : V}
+theorem slow_growth_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
   : slow_growth_at G u := by
   have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
@@ -235,7 +241,7 @@ theorem slow_growth_at_reach {G : SimpleGraph V} [G.LocallyFinite] {u v : V}
     ((slow_growth_at_ext 3 2).mp sg) ((slow_growth_at_ext 5).mp sg)
     <;> simp [Pi.le_def, helper, Avw, Avw.symm]
 
-theorem slow_growth_at_all {G : SimpleGraph V} [G.LocallyFinite] {v : V}
+theorem slow_growth_at_all [G.LocallyFinite]
   (c : G.Preconnected := by assumption) (sg : slow_growth_at G v := by assumption)
   : ∀ u, slow_growth_at G u := fun v ↦ slow_growth_at_reach (c _ _)
 
@@ -273,28 +279,28 @@ theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
         (f := fun r ↦ ↑(shell G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
       exact t
 
-theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
+theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
   (e₁ e₂ : Nat) (ε : Real := 1) (hε : 0 < ε := by simp) (sg : slow_growth_at G v := by assumption)
   : ∀ᶠ r in Filter.atTop, ((ball G (r + e₁) v).ncard : ℝ) / (ball G (r + e₂) v).ncard ≤ 1 + ε := by
   apply Filter.Tendsto.eventually_le_const (v := 1) (by simp [hε])
   cases Decidable.em (e₁ = e₂) with | inl h => ball! [h] | inr h =>
   rw [←slow_growth_at, slow_growth_at_ext]; exact sg
 
-@[simp] theorem fball_nonneg [G.LocallyFinite] {π : Policy V}
+@[simp] theorem fball_nonneg [G.LocallyFinite]
   : 0 ≤ ∑ x ∈ ball G r v, π.f x := by simp [Finset.sum_nonneg, π.f₀]
 
-@[simp] theorem fball_div_nonneg [G.LocallyFinite] {π : Policy V}
+@[simp] theorem fball_div_nonneg [G.LocallyFinite]
   : 0 ≤ (∑ x ∈ ball G r₁ v, π.f x) / ↑(ball G r₂ v).ncard := by simp [div_nonneg]
 
 @[simp] theorem fball_div_le_one [G.LocallyFinite] (h : r₁ ≤ r₂)
   : ((ball G r₁ v).ncard : Real) / ↑(ball G r₂ v).ncard ≤ 1 := by ball! [h]
 
-@[simp] theorem fball_le_mball [G.LocallyFinite] {π : Policy V}
+@[simp] theorem fball_le_mball [G.LocallyFinite]
   : (∑ x ∈ (ball G r v), π.f x) ≤ π.m * ↑(ball G r v).ncard := by
   rw [Set.ncard_eq_toFinset_card _, mul_comm, ←nsmul_eq_mul]
   apply Finset.sum_le_card_nsmul; simp [π.fₘ]
 
-@[simp] theorem fball_div_eventually_le [G.LocallyFinite] {π : Policy V}
+@[simp] theorem fball_div_eventually_le [G.LocallyFinite]
   (e₁ e₂ : Nat) (ε : Real := 1) (hε : 0 < ε := by simp) (sg : slow_growth_at G v := by assumption)
   : ∀ᶠ (r : Nat) in Filter.atTop,
     (∑ x ∈ (ball G (r + e₁) v), π.f x) / ↑(ball G (r + e₂) v).ncard ≤ π.m + ε := by
@@ -307,7 +313,7 @@ theorem eventually_le_of_slow_growth_at {G : SimpleGraph V} [G.LocallyFinite]
 @[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype s]
   : ∑ x ∈ s, (Policy.set S).f x = (s ∩ S).ncard := by simp [Policy.set, ←Set.ncard_coe_finset]
 
-theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
+theorem ufdensity_at_ext [G.LocallyFinite]
   {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
   : ufdensity_at G π v d e₁ e₂ ↔ ufdensity_at G π v d e₃ e₄ := by
   suffices h : ∀ e₁ e₂ e₃ e₄, ufdensity_at G π v d e₁ e₂ → ufdensity_at G π v d e₃ e₄ by aesop
@@ -326,7 +332,7 @@ theorem ufdensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {
     rw [←slow_growth_at, slow_growth_at_ext]; exact sg
   · apply fball_div_eventually_le <;> simp [*]
 
-theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {u v : V} {d : Real}
+theorem ufdensity_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (h : ufdensity_at G π v d := by assumption)
   (sg : slow_growth_at G v := by assumption)
   : ufdensity_at G π u d := by
@@ -358,31 +364,30 @@ theorem ufdensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V}
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
     · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
 
-theorem ufdensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {π : Policy V} {v : V} {d : Real}
+theorem ufdensity_at_all [G.LocallyFinite]
   (c : G.Preconnected := by assumption) (h : ufdensity_at G π v d := by assumption)
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, ufdensity_at G π u d := fun v ↦ ufdensity_at_reach (c _ _)
 
-theorem udensity_at_iff_ufdensity_at [G.LocallyFinite] {v : V} {e₁ e₂ : Nat} {d : Real}
+theorem udensity_at_iff_ufdensity_at [G.LocallyFinite]
   : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy.set S) v d e₁ e₂ := by
   simp [udensity_at, ufdensity_at]
 
-theorem udensity_at_ext {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V} {d : Real}
-  {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
+theorem udensity_at_ext [G.LocallyFinite] (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
   : udensity_at G S v d e₁ e₂ ↔ udensity_at G S v d e₃ e₄ := by
   simp only [udensity_at_iff_ufdensity_at]; apply ufdensity_at_ext; assumption
 
-theorem udensity_at_reach {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {u v : V} {d : Real}
+theorem udensity_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (h : udensity_at G S v d := by assumption)
   (sg : slow_growth_at G v := by assumption) : udensity_at G S u d := by
   rw [udensity_at_iff_ufdensity_at] at ⊢ h; exact ufdensity_at_reach r
 
-theorem udensity_at_all {G : SimpleGraph V} [G.LocallyFinite] {S : Set V} {v : V} {d : Real}
+theorem udensity_at_all [G.LocallyFinite]
   (c : G.Preconnected := by assumption) (h : udensity_at G S v d := by assumption)
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
 
-theorem slow_tiling_at_ext {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
+theorem slow_tiling_at_ext [G.LocallyFinite]
   (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
   : slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v e₃ e₄ := by
   let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v)
@@ -410,8 +415,8 @@ theorem slow_tiling_at_ext {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
     rw [←helper e₂ e₁ (by omega)]; constructor <;> apply t
   rw [assistant h₁₂, assistant h₃₄]
 
-theorem slow_growth_at_iff_slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] {τ : Tiling G}
-  (h₁₂ : e₁ ≠ e₂) : slow_growth_at G v e₁ e₂ ↔ slow_tiling_at τ v e₁ e₂ := by
+theorem slow_growth_at_iff_slow_tiling_at [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂)
+  : slow_growth_at G v e₁ e₂ ↔ slow_tiling_at τ v e₁ e₂ := by
   constructor <;> intro h
   · unfold slow_tiling_at; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
       (g := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + e₂ + τ.d) v).ncard)
@@ -459,7 +464,7 @@ theorem slow_growth_at_iff_slow_tiling_at {G : SimpleGraph V} [G.LocallyFinite] 
 
 
 
-theorem utufdensity_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat} (e₃ e₄ : Nat := 0)
+theorem utufdensity_at_ext [G.LocallyFinite] (e₃ e₄ : Nat := 0)
   : utufdensity_at τ π v d e₁ e₂ ↔ utufdensity_at τ π v d e₃ e₄ := by
   suffices ∀ e₁ e₂ e₃ e₄, utufdensity_at τ π v d e₁ e₂ → utufdensity_at τ π v d e₃ e₄ by aesop
   intro e₁ e₂ e₃ e₄ h
@@ -470,7 +475,7 @@ theorem utufdensity_at_ext [G.LocallyFinite] {v : V} {e₁ e₂ : Nat} (e₃ e�
 
 
 #check tendsto_of_tendsto_of_tendsto_of_le_of_le
-theorem ufdensity_at_tiling {G : SimpleGraph V} [G.LocallyFinite] (π : Policy V) (τ : Tiling G)
+theorem ufdensity_at_tiling [G.LocallyFinite] (π : Policy V) (τ : Tiling G)
   (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d / τ.n)
   (v : V) (sg : slow_growth_at G v)
   : ufdensity_at G π v d := by
