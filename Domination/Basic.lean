@@ -57,13 +57,9 @@ theorem Tiling.closure_nonempty (h : S.Nonempty) : (τ.closure S).Nonempty := by
   exact Set.Nonempty.mono (s := S) τ.subset_closure h
 
 noncomputable instance Tiling.closure_fintype [Fintype S] : Fintype (τ.closure S) := by
-  apply Set.Finite.fintype; unfold Tiling.closure; apply Set.Finite.biUnion
-  · simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
-    · intro u h; rw [Set.setOf_and]; apply Set.Finite.inter_of_left
-      conv => arg 1; arg 1; ext x; rw [eq_comm]
-      rw [Set.setOf_eq_eq_singleton]; exact Set.toFinite _
-    · intro u h; simp [h]
-  · intro t ht; exact Set.toFinite _
+  apply Set.Finite.fintype; unfold closure; apply Set.Finite.biUnion _ (fun _ _ ↦ Set.toFinite _)
+  simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
+  <;> (intro _ h; simp [h])
 
 @[simp] theorem Tiling.biUnion_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
