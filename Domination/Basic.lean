@@ -236,7 +236,7 @@ theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂ := by omeg
       cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => ball! [t, slow_growth_at] | inr =>
       rw [slow_growth_at_ext e₁ e₂]; exact h
     · simp_rw [add_assoc]; rw [←slow_growth_at]
-      cases Decidable.em ((e₁ + τ.d) = e₂) with | inl t => ball! [t, slow_growth_at] | inr =>
+      cases Decidable.em (e₁ + τ.d = e₂) with | inl t => ball! [t, slow_growth_at] | inr =>
       rw [slow_growth_at_ext e₁ e₂]; exact h
     all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
 
@@ -258,7 +258,41 @@ theorem slow_growth_at_reach [G.LocallyFinite]
   : slow_growth_at G u := by
   rw [←slow_tiling_at_iff (τ := Tiling.id G)] at ⊢ sg; exact slow_tiling_at_reach r
 
-
+-- note: e₁ < e₂ is not provable in general by counterexample: tree with #children = depth
+-- todo: add ext theorem and see if this can be refactored to use it like the others
+-- todo: also add reach theorem - could just do it via boundary to sg equivalence
+theorem slow_boundary_at_iff [G.LocallyFinite] (h₁₂ : e₂ < e₁ := by omega)
+  : slow_boundary_at G v e₁ e₂ ↔ slow_growth_at G v e₁ e₂ := match e₁, e₂ with
+  | 0, _ => by contradiction
+  | e₁ + 1, e₂ + 1 => by
+    have ih := slow_boundary_at_iff (e₁ := e₁) (e₂ := e₂) (v := v)
+    simp only [slow_growth_at, slow_boundary_at, add_comm e₁, add_comm e₂, ←add_assoc] at ⊢ ih
+    nth_rw 1 [←Filter.tendsto_add_atTop_iff_nat 1] at ih
+    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1] at ih; exact ih
+  | e₁ + 1, 0 => by
+    constructor <;> rw [slow_growth_at, slow_boundary_at] <;> intro h
+    · conv =>
+        arg 1; ext r
+        rw [←add_assoc, ball_eq_ball_shell, Set.ncard_union_eq (by ball!), Nat.cast_add, add_div]
+      conv => arg 3; rw [←add_zero 1]
+      apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
+      cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
+      rw [←slow_boundary_at_iff (e₁ := e₁ + 1) (e₂ := 0)]
+      have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
+        (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def, div_nonneg])
+        (f := fun r ↦ ↑(shell G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
+        (by simp_rw [←add_assoc, Pi.le_def]; intro r; apply div_le_div_of_nonneg_left <;> ball!)
+      simp_rw [show ∀ r : Nat, r + e₁ + 1 + 1 = r + 1 + e₁ + 1 by intro; ring] at t
+      rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
+        (f := fun r ↦ ↑(shell G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
+      exact t
+    · conv =>
+        arg 1; ext r
+        rw [←add_assoc, shell_eq_ball_sub, Set.ncard_diff (by ball!) (by ball!)]
+        rw [Nat.cast_sub (by ball!), sub_div, add_assoc]
+      rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
+      cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
+      rw [slow_growth_at_ext (e₁ + 1 + 1)]; exact h
 
 
 
@@ -281,44 +315,6 @@ def udensity_at (G : SimpleGraph V)
 ----------------------------------------------------------------------------------------------------
 
 
-
-theorem slow_growth_at_all [G.LocallyFinite]
-  (c : G.Preconnected := by assumption) (sg : slow_growth_at G v := by assumption)
-  : ∀ u, slow_growth_at G u := fun v ↦ slow_growth_at_reach (c _ _)
-
--- note: e₁ < e₂ is not provable in general by counterexample: tree with #children = depth
-theorem slow_growth_at_iff_slow_boundary_at [G.LocallyFinite] (v : V) :
-  ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_boundary_at G v e₁ e₂)
-  | 0, _, _ => by contradiction
-  | e₁ + 1, e₂ + 1, _ => by
-    have ih := slow_growth_at_iff_slow_boundary_at v e₁ e₂ (by omega)
-    simp only [slow_growth_at, slow_boundary_at, add_comm e₁, add_comm e₂, ←add_assoc] at ⊢ ih
-    nth_rw 1 [←Filter.tendsto_add_atTop_iff_nat 1] at ih
-    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1] at ih; exact ih
-  | e₁ + 1, 0, _ => by
-    constructor <;> rw [slow_growth_at, slow_boundary_at] <;> intro h
-    · conv =>
-        arg 1; ext r
-        rw [←add_assoc, shell_eq_ball_sub, Set.ncard_diff (by ball!) (by ball!)]
-        rw [Nat.cast_sub (by ball!), sub_div, add_assoc]
-      rw [←sub_self 1]; apply Filter.Tendsto.sub h; rw [←slow_growth_at] at ⊢ h
-      cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
-      rw [slow_growth_at_ext (e₁ + 1 + 1)]; exact h
-    · conv =>
-        arg 1; ext r
-        rw [←add_assoc, ball_eq_ball_shell, Set.ncard_union_eq (by ball!), Nat.cast_add, add_div]
-      conv => arg 3; rw [←add_zero 1]
-      apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
-      cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
-      rw [slow_growth_at_iff_slow_boundary_at v (e₁ + 1) 0 (by omega)]
-      have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
-        (g := fun r ↦ 0) (by simp) h (by simp [Pi.le_def, div_nonneg])
-        (f := fun r ↦ ↑(shell G (r + e₁ + 1 + 1) v).ncard / ↑(ball G (r + 1) v).ncard)
-        (by simp_rw [←add_assoc, Pi.le_def]; intro r; apply div_le_div_of_nonneg_left <;> ball!)
-      simp_rw [show ∀ r : Nat, r + e₁ + 1 + 1 = r + 1 + e₁ + 1 by intro; ring] at t
-      rw [Filter.tendsto_add_atTop_iff_nat 1 (α := Real)
-        (f := fun r ↦ ↑(shell G (r + e₁ + 1) v).ncard / ↑(ball G r v).ncard)] at t
-      exact t
 
 theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
   (e₁ e₂ : Nat) (ε : Real := 1) (hε : 0 < ε := by simp) (sg : slow_growth_at G v := by assumption)
@@ -404,10 +400,6 @@ theorem ufdensity_at_reach [G.LocallyFinite]
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
     · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
 
-theorem ufdensity_at_all [G.LocallyFinite]
-  (c : G.Preconnected := by assumption) (h : ufdensity_at G π v d := by assumption)
-  (sg : slow_growth_at G v := by assumption)
-  : ∀ u, ufdensity_at G π u d := fun v ↦ ufdensity_at_reach (c _ _)
 
 theorem udensity_at_iff_ufdensity_at [G.LocallyFinite]
   : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy.set S) v d e₁ e₂ := by
@@ -422,10 +414,7 @@ theorem udensity_at_reach [G.LocallyFinite]
   (sg : slow_growth_at G v := by assumption) : udensity_at G S u d := by
   rw [udensity_at_iff_ufdensity_at] at ⊢ h; exact ufdensity_at_reach r
 
-theorem udensity_at_all [G.LocallyFinite]
-  (c : G.Preconnected := by assumption) (h : udensity_at G S v d := by assumption)
-  (sg : slow_growth_at G v := by assumption)
-  : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
+
 
 
 
