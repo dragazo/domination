@@ -214,7 +214,7 @@ theorem slow_growth_at_ext [G.LocallyFinite]
   conv_rhs => arg 1; ext r; repeat rw [←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
   rw [←slow_tiling_at, ←slow_tiling_at]; exact slow_tiling_at_ext _ _
 
-theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂)
+theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂ := by omega)
   : slow_tiling_at τ v e₁ e₂ ↔ slow_growth_at G v e₁ e₂ := by
   constructor <;> intro h
   · unfold slow_growth_at; rw [←Filter.tendsto_add_atTop_iff_nat τ.d]
@@ -240,6 +240,28 @@ theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂)
       rw [slow_growth_at_ext e₁ e₂]; exact h
     all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
 
+theorem slow_tiling_at_reach [G.LocallyFinite]
+  (r : G.Reachable v u := by assumption) (sg : slow_tiling_at τ v := by assumption)
+  : slow_tiling_at τ u := by
+  have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
+    ((cball τ r₁ v).ncard : Real) / ((cball τ (r₂ + 1) v).ncard : Real) ≤
+    ((cball τ (r₁ + 1) u).ncard : Real) / ((cball τ r₂ u).ncard : Real) := by
+    apply div_le_div₀ (by simp) _ (by ball!) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by ball!)
+    <;> rw [cball_eq_union_cball] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
+  have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
+  apply ih ⟨Wwu⟩; rw [slow_tiling_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+    ((slow_tiling_at_ext 3 2).mp sg) ((slow_tiling_at_ext 5).mp sg)
+    <;> simp [Pi.le_def, helper, Avw, Avw.symm]
+
+theorem slow_growth_at_reach [G.LocallyFinite]
+  (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
+  : slow_growth_at G u := by
+  rw [←slow_tiling_at_iff (τ := Tiling.id G)] at ⊢ sg; exact slow_tiling_at_reach r
+
+
+
+
+
 
 
 ----------------------------------------------------------------------------------------------------
@@ -258,18 +280,7 @@ def udensity_at (G : SimpleGraph V)
 
 ----------------------------------------------------------------------------------------------------
 
-theorem slow_growth_at_reach [G.LocallyFinite]
-  (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
-  : slow_growth_at G u := by
-  have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
-    ((ball G r₁ v).ncard : Real) / ((ball G (r₂ + 1) v).ncard : Real) ≤
-    ((ball G (r₁ + 1) u).ncard : Real) / ((ball G r₂ u).ncard : Real) := by
-    apply div_le_div₀ (by simp) _ (by ball!) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by ball!)
-    <;> rw [ball_eq_union_ball] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
-  have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
-  apply ih ⟨Wwu⟩; rw [slow_growth_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-    ((slow_growth_at_ext 3 2).mp sg) ((slow_growth_at_ext 5).mp sg)
-    <;> simp [Pi.le_def, helper, Avw, Avw.symm]
+
 
 theorem slow_growth_at_all [G.LocallyFinite]
   (c : G.Preconnected := by assumption) (sg : slow_growth_at G v := by assumption)
