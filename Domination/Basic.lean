@@ -22,14 +22,17 @@ structure Tiling (G : SimpleGraph V) where
 
 variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
 
+----------------------------------------------------------------------------------------------------
+
 noncomputable def Policy.set (S : Set V) : Policy V := {
   f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
 }
 
+@[simp] theorem Policy.sum_eq_inter_ncard (s t : Set V) [Fintype s]
+  : ∑ x ∈ s, (Policy.set t).f x = (s ∩ t).ncard := by simp [Policy.set, ←Set.ncard_coe_finset]
+
 noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | τ.f v = t} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
-
-----------------------------------------------------------------------------------------------------
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
@@ -175,8 +178,67 @@ def slow_boundary_at (G : SimpleGraph V) (v : V) (e₁ e₂ : Nat := 0) := Filte
 
 ----------------------------------------------------------------------------------------------------
 
+theorem slow_tiling_at_ext [G.LocallyFinite]
+  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
+  : slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v e₃ e₄ := by
+  let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v)
+  | 0, _, _ => by contradiction
+  | e₁ + 1, e₂ + 1, _ => by
+    simp_rw [←helper e₁ e₂ (by omega), slow_tiling_at, add_comm e₁, add_comm e₂, ←add_assoc]
+    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
+  | e₁ + 1, 0, _ => by
+    cases Decidable.em (e₁ = 0) with | inl t => simp [t] | inr =>
+    rw [←helper e₁ 0 (by omega)]; unfold slow_tiling_at; constructor <;> intro h
+    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> ball!
+    · conv =>
+        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(cball τ (r + 1) v).ncard) (by ball! [])]
+      conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
+      apply Filter.Tendsto.mul
+      · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
+      · rw [←slow_tiling_at] at ⊢ h; rw [helper e₁ 0 (by omega)] at h; exact h
+  have assistant : ∀ {e₁ e₂}, e₁ ≠ e₂ → (slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v) := by
+    have t : ∀ e₁ e₂, slow_tiling_at τ v e₁ e₂ → slow_tiling_at τ v e₂ e₁ := fun e₁ e₂ h ↦ by
+      unfold slow_tiling_at
+      conv => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
+      conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
+      exact Filter.Tendsto.inv₀ h (by simp)
+    intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr =>
+    rw [←helper e₂ e₁ (by omega)]; constructor <;> apply t
+  rw [assistant h₁₂, assistant h₃₄]
 
+theorem slow_growth_at_ext [G.LocallyFinite]
+  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
+  : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
+  unfold slow_growth_at
+  conv_lhs => arg 1; ext r; repeat rw [←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
+  conv_rhs => arg 1; ext r; repeat rw [←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
+  rw [←slow_tiling_at, ←slow_tiling_at]; exact slow_tiling_at_ext _ _
 
+theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂)
+  : slow_tiling_at τ v e₁ e₂ ↔ slow_growth_at G v e₁ e₂ := by
+  constructor <;> intro h
+  · unfold slow_growth_at; rw [←Filter.tendsto_add_atTop_iff_nat τ.d]
+    simp_rw [add_assoc, add_comm τ.d, ←add_assoc]
+    apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+      (g := fun r ↦ ((cball τ (r + e₁) v).ncard : Real) / (cball τ (r + e₂ + τ.d) v).ncard)
+      (h := fun r ↦ ((cball τ (r + e₁ + τ.d) v).ncard : Real) / (cball τ (r + e₂) v).ncard)
+    · simp_rw [add_assoc]; rw [←slow_tiling_at]
+      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => ball! [t, slow_tiling_at] | inr =>
+      rw [slow_tiling_at_ext e₁ e₂]; exact h
+    · simp_rw [add_assoc]; rw [←slow_tiling_at]
+      cases Decidable.em (e₁ + τ.d = e₂) with | inl t => ball! [t, slow_tiling_at] | inr =>
+      rw [slow_tiling_at_ext e₁ e₂]; exact h
+    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
+  · unfold slow_tiling_at; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+      (g := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + e₂ + τ.d) v).ncard)
+      (h := fun r ↦ ((ball G (r + e₁ + τ.d) v).ncard : Real) / (ball G (r + e₂) v).ncard)
+    · simp_rw [add_assoc]; rw [←slow_growth_at]
+      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => ball! [t, slow_growth_at] | inr =>
+      rw [slow_growth_at_ext e₁ e₂]; exact h
+    · simp_rw [add_assoc]; rw [←slow_growth_at]
+      cases Decidable.em ((e₁ + τ.d) = e₂) with | inl t => ball! [t, slow_growth_at] | inr =>
+      rw [slow_growth_at_ext e₁ e₂]; exact h
+    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
 
 
 
@@ -195,34 +257,6 @@ def udensity_at (G : SimpleGraph V)
   (fun r ↦ (((ball G (r + e₁) v) ∩ S).ncard : Real) / ↑(ball G (r + e₂) v).ncard) Filter.atTop = d
 
 ----------------------------------------------------------------------------------------------------
-
--- todo: refractor this to use the tiling ext theorem with a unit tile
-theorem slow_growth_at_ext [G.LocallyFinite]
-  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
-  : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
-  let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v)
-  | 0, _, _ => by contradiction
-  | e₁ + 1, e₂ + 1, _ => by
-    simp_rw [←helper e₁ e₂ (by omega), slow_growth_at, add_comm e₁, add_comm e₂, ←add_assoc]
-    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
-  | e₁ + 1, 0, _ => by
-    cases Decidable.em (e₁ = 0) with | inl t => simp [t] | inr =>
-    rw [←helper e₁ 0 (by omega)]; unfold slow_growth_at; constructor <;> intro h
-    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> ball!
-    · conv => arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(ball G (r + 1) v).ncard) (by ball!)]
-      conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
-      apply Filter.Tendsto.mul
-      · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
-      · rw [←slow_growth_at] at ⊢ h; rw [helper e₁ 0 (by omega)] at h; exact h
-  have assistant : ∀ {e₁ e₂}, e₁ ≠ e₂ → (slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v) := by
-    have t : ∀ e₁ e₂, slow_growth_at G v e₁ e₂ → slow_growth_at G v e₂ e₁ := fun e₁ e₂ h ↦ by
-      unfold slow_growth_at
-      conv => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
-      conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
-      exact Filter.Tendsto.inv₀ h (by simp)
-    intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr =>
-    rw [←helper e₂ e₁ (by omega)]; constructor <;> apply t
-  rw [assistant h₁₂, assistant h₃₄]
 
 theorem slow_growth_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
@@ -306,8 +340,7 @@ theorem eventually_le_of_slow_growth_at [G.LocallyFinite]
   · conv_rhs => rw [←mul_one π.m, ←mul_div_cancel₀ ε (ne_of_lt π.hm).symm, ←mul_add]
     apply mul_le_mul_of_nonneg_left _ (le_of_lt π.hm); exact q
 
-@[simp] theorem Policy₀₁.sum_eq_ncard (S s : Set V) [Fintype s]
-  : ∑ x ∈ s, (Policy.set S).f x = (s ∩ S).ncard := by simp [Policy.set, ←Set.ncard_coe_finset]
+
 
 theorem ufdensity_at_ext [G.LocallyFinite]
   {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
@@ -383,59 +416,9 @@ theorem udensity_at_all [G.LocallyFinite]
   (sg : slow_growth_at G v := by assumption)
   : ∀ u, udensity_at G S u d := fun v ↦ udensity_at_reach (c _ _)
 
-theorem slow_tiling_at_ext [G.LocallyFinite]
-  (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
-  : slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v e₃ e₄ := by
-  let rec helper : ∀ e₁ e₂, e₂ < e₁ → (slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v)
-  | 0, _, _ => by contradiction
-  | e₁ + 1, e₂ + 1, _ => by
-    simp_rw [←helper e₁ e₂ (by omega), slow_tiling_at, add_comm e₁, add_comm e₂, ←add_assoc]
-    nth_rw 2 [←Filter.tendsto_add_atTop_iff_nat 1]
-  | e₁ + 1, 0, _ => by
-    cases Decidable.em (e₁ = 0) with | inl t => simp [t] | inr =>
-    rw [←helper e₁ 0 (by omega)]; unfold slow_tiling_at; constructor <;> intro h
-    · apply tendsto_of_tendsto_of_tendsto_of_le_of_le (g := fun r ↦ 1) (by simp) h <;> ball!
-    · conv =>
-        arg 1; ext r; rw [←div_mul_div_cancel₀ (b := ↑(cball τ (r + 1) v).ncard) (by ball! [])]
-      conv => arg 3; rw [show (1 : Real) = 1 * 1 by simp]
-      apply Filter.Tendsto.mul
-      · simp_rw [add_comm e₁, ←add_assoc]; rw [←Filter.tendsto_add_atTop_iff_nat 1] at h; exact h
-      · rw [←slow_tiling_at] at ⊢ h; rw [helper e₁ 0 (by omega)] at h; exact h
-  have assistant : ∀ {e₁ e₂}, e₁ ≠ e₂ → (slow_tiling_at τ v e₁ e₂ ↔ slow_tiling_at τ v) := by
-    have t : ∀ e₁ e₂, slow_tiling_at τ v e₁ e₂ → slow_tiling_at τ v e₂ e₁ := fun e₁ e₂ h ↦ by
-      unfold slow_tiling_at
-      conv => arg 1; ext r; rw [show ∀ a b : Real, a / b = (b / a)⁻¹ by intros; simp]
-      conv => arg 3; rw [show (1 : Real) = 1⁻¹ by simp]
-      exact Filter.Tendsto.inv₀ h (by simp)
-    intro e₁ e₂ _; cases Decidable.em (e₂ < e₁) with | inl h => exact helper e₁ e₂ h | inr =>
-    rw [←helper e₂ e₁ (by omega)]; constructor <;> apply t
-  rw [assistant h₁₂, assistant h₃₄]
 
-theorem slow_growth_at_iff_slow_tiling_at [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂)
-  : slow_growth_at G v e₁ e₂ ↔ slow_tiling_at τ v e₁ e₂ := by
-  constructor <;> intro h
-  · unfold slow_tiling_at; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-      (g := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + e₂ + τ.d) v).ncard)
-      (h := fun r ↦ ((ball G (r + e₁ + τ.d) v).ncard : Real) / (ball G (r + e₂) v).ncard)
-    · simp_rw [add_assoc]; rw [←slow_growth_at]
-      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => ball! [t, slow_growth_at] | inr =>
-      rw [slow_growth_at_ext e₁ e₂]; exact h
-    · simp_rw [add_assoc]; rw [←slow_growth_at]
-      cases Decidable.em ((e₁ + τ.d) = e₂) with | inl t => ball! [t, slow_growth_at] | inr =>
-      rw [slow_growth_at_ext e₁ e₂]; exact h
-    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
-  · unfold slow_growth_at; rw [←Filter.tendsto_add_atTop_iff_nat τ.d]
-    simp_rw [add_assoc, add_comm τ.d, ←add_assoc]
-    apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-      (g := fun r ↦ ((cball τ (r + e₁) v).ncard : Real) / (cball τ (r + e₂ + τ.d) v).ncard)
-      (h := fun r ↦ ((cball τ (r + e₁ + τ.d) v).ncard : Real) / (cball τ (r + e₂) v).ncard)
-    · simp_rw [add_assoc]; rw [←slow_tiling_at]
-      cases Decidable.em (e₁ = e₂ + τ.d) with | inl t => ball! [t, slow_tiling_at] | inr =>
-      rw [slow_tiling_at_ext e₁ e₂]; exact h
-    · simp_rw [add_assoc]; rw [←slow_tiling_at]
-      cases Decidable.em (e₁ + τ.d = e₂) with | inl t => ball! [t, slow_tiling_at] | inr =>
-      rw [slow_tiling_at_ext e₁ e₂]; exact h
-    all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
+
+
 
 
 #check div_le_div_iff_of_pos_right
