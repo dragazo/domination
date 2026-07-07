@@ -364,25 +364,14 @@ theorem cfudensity_at_reach [G.LocallyFinite]
     apply le_antisymm <;> (apply h <;> simp [*, Avw.symm])
   intro v w e₁ e₂ stv stw Avw; rw [cfudensity_at_ext e₁ (e₂ + 1)]
   apply le_trans (b := cfudensity_at τ π w (e₁ + 1) e₂) _ (by rw [cfudensity_at_ext e₁ e₂])
-  have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
-    (∑ x ∈ cball τ r₁ v, π.f x) / (cball τ (r₂ + 1) v).ncard ≤
-    (∑ x ∈ cball τ (r₁ + 1) u, π.f x) / (cball τ r₂ u).ncard := by
-    apply div_le_div₀ (by ball!) _ (by ball!)
-    · norm_cast; apply Set.ncard_le_ncard _ (by ball!); rw [cball_eq_union_cball]
-      exact Set.subset_biUnion_of_mem (by simp [Avu])
-    · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by simp [π.f₀])
-      rw [Set.subset_toFinset, Set.coe_toFinset, cball_eq_union_cball]
-      exact Set.subset_biUnion_of_mem (by simp [Avu.symm])
   unfold cfudensity_at; apply Filter.limsup_le_limsup
   · apply Filter.Eventually.of_forall; intro r
     dsimp; apply div_le_div₀ (by ball!) _ (by ball!) _
     · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by ball! [π.f₀])
       simp only [Set.subset_toFinset, Set.coe_toFinset]
-      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem
-      simp only [ball₁, Set.mem_insert_iff, SimpleGraph.mem_neighborSet]; right; exact Avw
+      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem; ball! [Avw]
     · simp only [Nat.cast_le]; apply Set.ncard_le_ncard _ (by ball!)
-      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem
-      simp only [ball₁, Set.mem_insert_iff, SimpleGraph.mem_neighborSet]; right; exact Avw.symm
+      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem; ball! [Avw.symm]
   · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
   · exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le <;> simp [*]
 
