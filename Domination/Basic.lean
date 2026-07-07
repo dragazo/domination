@@ -359,19 +359,18 @@ theorem cfudensity_at_reach [G.LocallyFinite]
   : cfudensity_at τ π v e₁ e₂ = cfudensity_at τ π u e₁ e₂ := by
   obtain ⟨Wvu⟩ := r; induction Wvu with | nil => rfl | @cons v w u Avw Wwu ih =>
   have st' := slow_tiling_at_reach (SimpleGraph.Adj.reachable Avw); rw [←ih st']
-  suffices h : ∀ v w e₁ e₂, slow_tiling_at τ v → slow_tiling_at τ w → G.Adj w v →
+  suffices h : ∀ v w, slow_tiling_at τ v → slow_tiling_at τ w → G.Adj w v →
     cfudensity_at τ π v e₁ e₂ ≤ cfudensity_at τ π w e₁ e₂ by
     apply le_antisymm <;> (apply h <;> simp [*, Avw.symm])
-  intro v w e₁ e₂ stv stw Avw; rw [cfudensity_at_ext e₁ (e₂ + 1)]
+  intro v w stv stw Avw; rw [cfudensity_at_ext e₁ (e₂ + 1)]
   apply le_trans (b := cfudensity_at τ π w (e₁ + 1) e₂) _ (by rw [cfudensity_at_ext e₁ e₂])
   unfold cfudensity_at; apply Filter.limsup_le_limsup
-  · apply Filter.Eventually.of_forall; intro r
-    dsimp; apply div_le_div₀ (by ball!) _ (by ball!) _
+  · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
     · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by ball! [π.f₀])
-      simp only [Set.subset_toFinset, Set.coe_toFinset]
-      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem; ball! [Avw]
-    · simp only [Nat.cast_le]; apply Set.ncard_le_ncard _ (by ball!)
-      rw [←add_assoc, cball_eq_union_cball]; apply Set.subset_biUnion_of_mem; ball! [Avw.symm]
+      rw [Set.subset_toFinset, Set.coe_toFinset, ←add_assoc, cball_eq_union_cball]
+      apply Set.subset_biUnion_of_mem; ball! [Avw]
+    · norm_cast; apply Set.ncard_le_ncard _ (by ball!); rw [←add_assoc, cball_eq_union_cball]
+      apply Set.subset_biUnion_of_mem; ball! [Avw.symm]
   · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
   · exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le <;> simp [*]
 
