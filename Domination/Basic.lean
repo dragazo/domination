@@ -257,10 +257,9 @@ theorem slow_tiling_at_reach [G.LocallyFinite]
     ((cball τ (r₁ + 1) u).ncard : Real) / ((cball τ r₂ u).ncard : Real) := by
     apply div_le_div₀ (by simp) _ (by ball!) <;> norm_cast <;> apply Set.ncard_le_ncard _ (by ball!)
     <;> rw [cball_eq_union_cball] <;> exact Set.subset_biUnion_of_mem (by simp [Avu, Avu.symm])
-  have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
-  apply ih ⟨Wwu⟩; rw [slow_tiling_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-    ((slow_tiling_at_ext 3 2).mp st) ((slow_tiling_at_ext 5).mp st)
-    <;> simp [Pi.le_def, helper, Avw, Avw.symm]
+  have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u vw wu ih =>
+  apply ih ⟨wu⟩; rw [slow_tiling_at_ext 4 1]; apply tendsto_of_tendsto_of_tendsto_of_le_of_le
+    ((slow_tiling_at_ext 3 2).mp st) ((slow_tiling_at_ext 5).mp st) <;> ball! [helper, vw, vw.symm]
 
 theorem slow_growth_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
@@ -323,12 +322,12 @@ theorem cball_div_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real :
   ((cball τ (r + e₁) v).ncard : Real) / (cball τ (r + e₂) v).ncard ≤ 1 + ε := by
   apply Filter.Tendsto.eventually_le_const (v := 1) (by simp [hε])
   cases Decidable.em (e₁ = e₂) with | inl h => ball! [h] | inr h =>
-  rw [←slow_tiling_at, slow_tiling_at_ext]; exact st
+  rw [←slow_tiling_at, slow_tiling_at_ext]; assumption
 
 theorem cball_fdiv_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real := 1)
   (hε : 0 < ε := by omega) (st : slow_tiling_at τ v := by assumption) : ∀ᶠ r in Filter.atTop,
   (∑ x ∈ (cball τ (r + e₁) v), π.f x) / (cball τ (r + e₂) v).ncard ≤ π.m + ε := by
-  apply Filter.Eventually.mono (cball_div_eventually_le e₁ e₂ (ε / π.m) (div_pos hε π.hm))
+  apply Filter.Eventually.mono (cball_div_eventually_le e₁ e₂ (ε / π.m) (div_pos hε π.hm) (τ := τ))
   intro r q; apply le_trans (b := π.m * (↑(cball τ (r + e₁) v).ncard / ↑(cball τ (r + e₂) v).ncard))
   · rw [mul_div]; apply div_le_div_of_nonneg_right <;> ball!
   · conv_rhs => rw [←mul_one π.m, ←mul_div_cancel₀ ε (ne_of_lt π.hm).symm, ←mul_add]
@@ -345,14 +344,44 @@ theorem cfudensity_at_ext [G.LocallyFinite]
   rw [←one_mul (cfudensity_at τ π v e₃ e₄)]
   apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ _ (by ball!) (by ball!) _ _
   · cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl h => ball! [h, slow_tiling_at] | inr h =>
-    rw [←slow_tiling_at, slow_tiling_at_ext]; exact st
+    rw [←slow_tiling_at, slow_tiling_at_ext]; assumption
   · simp_rw [add_comm e₃, ←add_assoc]
     rw [Filter.limsup_nat_add (fun r ↦ (∑ x ∈ (cball τ (r + e₃) v).toFinset, π.f x)
       / (cball τ (r + e₄) v).ncard) e₁, ←cfudensity_at]
   · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
     cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl t => ball! [t] | inr t =>
-    rw [←slow_tiling_at, slow_tiling_at_ext]; exact st
+    rw [←slow_tiling_at, slow_tiling_at_ext]; assumption
   · apply cball_fdiv_eventually_le <;> simp [*]
+
+theorem fudensity_at_ext [G.LocallyFinite]
+  (e₃ e₄ : Nat := 0) (sg : slow_growth_at G v := by assumption)
+  : fudensity_at G π v e₁ e₂ = fudensity_at G π v e₃ e₄ := by
+  rw [←slow_tiling_at_iff (τ := Tiling.id G)] at sg; unfold fudensity_at
+  have cvt {r} : (ball G r v).toFinset = (cball (Tiling.id G) r v).toFinset := by ball! [cball]
+  conv_lhs => arg 1; ext r; rw [cvt, ←Tiling.id_closure (G := G) (S := (ball G _ v)), ←cball]
+  conv_rhs => arg 1; ext r; rw [cvt, ←Tiling.id_closure (G := G) (S := (ball G _ v)), ←cball]
+  rw [←cfudensity_at, ←cfudensity_at]; exact cfudensity_at_ext _ _
+
+theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_tiling_at τ v := by assumption)
+  : cfudensity_at τ π v e₁ e₂ = fudensity_at G π v e₁ e₂ := by
+  have sg := (slow_tiling_at_iff).mp st
+  have st' := (slow_tiling_at_iff (τ := Tiling.id G)).mpr sg
+  apply le_antisymm
+  · rw [fudensity_at_ext (e₁ + τ.d) e₂]; apply Filter.limsup_le_limsup
+    · apply Filter.Eventually.of_forall; intro r; dsimp; apply div_le_div₀ (by ball!) _ (by ball!) _
+      · apply Finset.sum_le_sum_of_subset_of_nonneg <;> ball! [←add_assoc, π.f₀]
+      · apply le_trans (b := ↑(cball τ (r + e₂) v).ncard) <;> ball!
+    · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
+    · exists π.m + 1; rw [Filter.eventually_map]; dsimp
+      have cvt {r} : (ball G r v).toFinset = (cball (Tiling.id G) r v).toFinset := by ball! [cball]
+      conv => arg 1; ext r; rw [cvt, ←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
+      apply cball_fdiv_eventually_le <;> simp [*]
+  · rw [fudensity_at_ext e₁ (e₂ + τ.d)]; apply Filter.limsup_le_limsup
+    · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
+      · apply Finset.sum_le_sum_of_subset_of_nonneg <;> ball! [←add_assoc, π.f₀]
+      · ball! [←add_assoc]
+    · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
+    · exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le <;> simp [*]
 
 theorem cfudensity_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (st : slow_tiling_at τ v := by assumption)
@@ -364,7 +393,7 @@ theorem cfudensity_at_reach [G.LocallyFinite]
     apply le_antisymm <;> (apply h <;> simp [*, Avw.symm])
   intro v w stv stw Avw; rw [cfudensity_at_ext e₁ (e₂ + 1)]
   apply le_trans (b := cfudensity_at τ π w (e₁ + 1) e₂) _ (by rw [cfudensity_at_ext e₁ e₂])
-  unfold cfudensity_at; apply Filter.limsup_le_limsup
+  apply Filter.limsup_le_limsup
   · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
     · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by ball! [π.f₀])
       rw [Set.subset_toFinset, Set.coe_toFinset, ←add_assoc, cball_eq_union_cball]
@@ -374,38 +403,11 @@ theorem cfudensity_at_reach [G.LocallyFinite]
   · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
   · exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le <;> simp [*]
 
-
--- theorem ufdensity_at_reach [G.LocallyFinite]
---   (r : G.Reachable v u := by assumption) (h : ufdensity_at G π v d := by assumption)
---   (sg : slow_growth_at G v := by assumption)
---   : ufdensity_at G π u d := by
---   have ⟨Wvu⟩ := r; induction Wvu with | nil => assumption | @cons v w u Avw Wwu ih =>
---   apply ih ⟨Wwu⟩ _ (slow_growth_at_reach (SimpleGraph.Adj.reachable Avw))
---   have sgw : slow_growth_at G w := slow_growth_at_reach (SimpleGraph.Adj.reachable Avw)
---   have helper (v u : V) (r₁ r₂ : Nat) (Avu : G.Adj v u) :
---     (∑ x ∈ ball G r₁ v, π.f x) / (ball G (r₂ + 1) v).ncard ≤
---     (∑ x ∈ ball G (r₁ + 1) u, π.f x) / (ball G r₂ u).ncard := by
---     apply div_le_div₀ (by simp) _ (by ball!)
---     · norm_cast; apply Set.ncard_le_ncard _ (by ball!); rw [ball_eq_union_ball]
---       exact Set.subset_biUnion_of_mem (by simp [Avu])
---     · apply Finset.sum_le_sum_of_subset_of_nonneg _ (by simp [π.f₀])
---       rw [Set.subset_toFinset, Set.coe_toFinset, ball_eq_union_ball]
---       exact Set.subset_biUnion_of_mem (by simp [Avu.symm])
---   rw [ufdensity_at_ext 1 1]; apply le_antisymm
---   · apply le_trans (b := Filter.limsup
---       (fun r ↦ (∑ x ∈ ball G (r + 2) v, π.f x) / ↑(ball G (r + 0) v).ncard) Filter.atTop)
---       _ (le_of_eq (by rw [←ufdensity_at, ufdensity_at_ext]; exact h))
---     apply Filter.limsup_le_limsup
---     · apply Filter.Eventually.of_forall; simp [*, Avw.symm]
---     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
---     · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
---   · apply le_trans (b := Filter.limsup
---       (fun r ↦ (∑ x ∈ ball G (r + 0) v, π.f x) / ↑(ball G (r + 2) v).ncard) Filter.atTop)
---       (le_of_eq (Eq.symm (by rw [←ufdensity_at, ufdensity_at_ext]; exact h)))
---     apply Filter.limsup_le_limsup
---     · apply Filter.Eventually.of_forall; simp [*]
---     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; simp
---     · exists π.m + 1; apply fball_div_eventually_le <;> simp [*]
+theorem fudensity_at_reach [G.LocallyFinite]
+  (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
+  : fudensity_at G π v e₁ e₂ = fudensity_at G π u e₁ e₂ := by
+  rw [←slow_tiling_at_iff (τ := Tiling.id G)] at sg; have sg' := slow_tiling_at_reach r sg
+  (repeat rw [←cfudensity_at_eq (τ := Tiling.id G)]); rw [cfudensity_at_reach]
 
 
 
@@ -417,40 +419,6 @@ theorem cfudensity_at_reach [G.LocallyFinite]
 
 
 
-theorem ufdensity_at_ext [G.LocallyFinite]
-  {e₁ e₂ : Nat} (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
-  : fudensity_at G π v e₁ e₂ = fudensity_at G π v e₃ e₄ := by
-  suffices h : ∀ e₁ e₂ e₃ e₄, fudensity_at G π v e₁ e₂ = fudensity_at G π v e₃ e₄ by aesop
-  intro e₁ e₂ e₃ e₄
-  conv_lhs => rw [fudensity_at, ←Filter.limsup_nat_add _ e₁]; arg 1; ext r; rw [add_assoc]
-  conv_rhs => rw [fudensity_at, ←Filter.limsup_nat_add _ e₃]; arg 1; ext r; rw [add_assoc, add_comm e₃]
-  conv_lhs =>
-    arg 1; ext r
-    rw [←div_mul_div_cancel₀ (b := ((ball G (r + (e₂ + e₃)) v).ncard : Real)) (by ball!), mul_comm]
-  conv_rhs => rw [←one_mul d]
-  apply limsup_mul_eq (m₁ := 2) (m₂ := π.m + 1) _ h (by simp [div_nonneg]) (by simp) _ _
-  · cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => ball! [t] | inr t =>
-    rw [←slow_growth_at, slow_growth_at_ext]; exact sg
-  · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
-    cases Decidable.em (e₂ + e₃ = e₁ + e₄) with | inl t => ball! [t] | inr t =>
-    rw [←slow_growth_at, slow_growth_at_ext]; exact sg
-  · apply fball_div_eventually_le <;> simp [*]
-
-
-
-
-theorem udensity_at_iff_ufdensity_at [G.LocallyFinite]
-  : udensity_at G S v d e₁ e₂ ↔ ufdensity_at G (Policy.set S) v d e₁ e₂ := by
-  simp [udensity_at, ufdensity_at]
-
-theorem udensity_at_ext [G.LocallyFinite] (e₃ e₄ := 0) (sg : slow_growth_at G v := by assumption)
-  : udensity_at G S v d e₁ e₂ ↔ udensity_at G S v d e₃ e₄ := by
-  simp only [udensity_at_iff_ufdensity_at]; apply ufdensity_at_ext; assumption
-
-theorem udensity_at_reach [G.LocallyFinite]
-  (r : G.Reachable v u := by assumption) (h : udensity_at G S v d := by assumption)
-  (sg : slow_growth_at G v := by assumption) : udensity_at G S u d := by
-  rw [udensity_at_iff_ufdensity_at] at ⊢ h; exact ufdensity_at_reach r
 
 
 
@@ -459,46 +427,15 @@ theorem udensity_at_reach [G.LocallyFinite]
 
 
 
-#check div_le_div_iff_of_pos_right
-#check Filter.limUnder_eq_iff
-
-
-
-
-  -- constructor <;> intro h
-  -- · unfold slow_tiling_at
-  --   apply tendsto_of_tendsto_of_tendsto_of_le_of_le
-  --     (g := fun r ↦ ((ball G (r + (e₁ + τ.d)) v).ncard : Real) / (ball G (r + e₂) v).ncard)
-  --     (h := fun r ↦ ((ball G (r + e₁) v).ncard : Real) / (ball G (r + (e₂ + τ.d)) v).ncard)
-  --   · sorry
-  --   · rw [←slow_growth_at, slow_growth_at_ext e₁ e₂ _ _]
-  --     · exact h
-  --     · by_contra p
-  --     · sorry
-  --   · sorry
-  --   · sorry
-  -- · sorry
 
 
 
 
 
 
-  sorry
 
-
-#check tendsto_of_tendsto_of_tendsto_of_le_of_le
-theorem ufdensity_at_tiling [G.LocallyFinite] (π : Policy V) (τ : Tiling G)
+theorem cfudensity_at_tiling [G.LocallyFinite]
   (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d / τ.n)
-  (v : V) (sg : slow_growth_at G v)
-  : ufdensity_at G π v d := by
-  rw [ufdensity_at_ext τ.d τ.d]
-  unfold ufdensity_at
-  apply le_antisymm
-  · apply le_trans (b := Filter.limsup (fun r ↦
-      (∑ x ∈ (cball τ (r + τ.d) v).toFinset, π.f x) / ↑(cball τ (r + 0) v).ncard) Filter.atTop)
-    · sorry
-    · apply le_of_eq
-      -- rw [←utufdensity_at]
-      sorry
-  · sorry
+  (sg : slow_growth_at G v := by assumption)
+  : cfudensity_at τ π v = d := by
+  sorry
