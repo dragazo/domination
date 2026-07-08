@@ -17,7 +17,7 @@ structure Tiling (G : SimpleGraph V) where
   d : Nat
   n₀ : n ≠ 0 := by norm_num
   d₀ : d ≠ 0 := by norm_num
-  h₁ : ∀ t, {v | f v = t}.ncard = n := by aesop
+  h₁ : ∀ t, {v | t = f v}.ncard = n := by aesop
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
 variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
@@ -39,51 +39,56 @@ theorem Policy.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, π.f x) ≤ π.m * S.n
 
 ----------------------------------------------------------------------------------------------------
 
-noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | τ.f v = t} := by
+noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | t = τ.f v} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
 def Tiling.closure (τ : Tiling G) (S : Set V) : Set V :=
-  ⋃ t ∈ {t | ∃ u ∈ {x | τ.f x = t}, u ∈ S}, {x | τ.f x = t}
+  ⋃ t ∈ τ.f '' S, {x | t = τ.f x}
 
 @[simp] theorem Tiling.id_closure : (Tiling.id G).closure S = S := by
   ext x; simp [closure, id]; tauto
 
 @[simp] theorem Tiling.closure_idemp : τ.closure (τ.closure S) = τ.closure S := by
-  ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
-    exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
-  · intro y hy z hz h; exists z; rw [hz, hy]; simp [h]
-  · intro y hy h; exists y; apply And.intro hy; exists y
+  ext x; constructor <;> simp only [closure, Set.mem_image, Set.iUnion_exists, Set.biUnion_and',
+    Set.iUnion_iUnion_eq_right, Set.mem_iUnion,  exists_prop, forall_exists_index, and_imp]
+  · intro a b c d e; exists a; repeat simp [*] at *
+  · intro a b c; exists a; apply And.intro b; exists a
 
-theorem Tiling.subset_closure : S ⊆ τ.closure S := by
-  intro x hx; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
-    exists_and_right, exists_eq_right']; exists x
+theorem Tiling.subset_closure : S ⊆ τ.closure S := by intro x hx; simp [closure]; tauto
 
 theorem Tiling.closure_mono (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure S₂ := by
-  intro x; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
-    exists_and_right, exists_eq_right']; intro ⟨y, hy₁, hy₂⟩; exists y; simp [hy₁, h hy₂]
+  intro x; simp only [closure, Set.mem_image, Set.iUnion_exists, Set.biUnion_and',
+    Set.iUnion_iUnion_eq_right, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, forall_exists_index,
+    and_imp]; intro a b c; exists a; simp [c, h b]
 
 theorem Tiling.closure_mem (h : x ∈ S) : x ∈ τ.closure S := by
-  simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
-    exists_and_right, exists_eq_right']; exists x
+  simp only [closure, Set.mem_image, Set.iUnion_exists, Set.biUnion_and',
+    Set.iUnion_iUnion_eq_right, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]; exists x
 
 theorem Tiling.closure_nonempty (h : S.Nonempty) : (τ.closure S).Nonempty := by
   exact Set.Nonempty.mono (s := S) τ.subset_closure h
 
 noncomputable instance Tiling.closure_fintype [Fintype S] : Fintype (τ.closure S) := by
-  apply Set.Finite.fintype; unfold closure; apply Set.Finite.biUnion _ (fun _ _ ↦ Set.toFinite _)
-  simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
-  <;> (intro _ h; simp [h])
+  apply Set.Finite.fintype; apply Set.Finite.biUnion _ (fun _ _ ↦ Set.toFinite _)
+  apply Set.Finite.image; apply Set.toFinite
 
 noncomputable instance Tiling.tile_image_fintype [Fintype S] : Fintype (τ.f '' S) := by
   apply Set.Finite.fintype; apply Set.Finite.image; exact Set.toFinite _
 
-@[simp] theorem Tiling.biUnion_closure_eq {f : V → Set V}
-  : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
-  ext x; constructor <;> simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion,
-    exists_prop, exists_and_right, exists_eq_right', forall_exists_index, and_imp]
-  <;> (intro y hy z hz₁ hz₂; exists z; apply And.intro hz₁; exists y)
+theorem Tiling.biUnion_closure_eq {f : V → Set V}
+  : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by simp [closure]
+
+theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.closure S), f x
+  = ∑ y ∈ τ.f '' S, ∑ x ∈ {v | y = τ.f v}.toFinset, f x := by
+  classical
+  rw [←Finset.sum_biUnion]
+  · apply Finset.sum_congr _ (by simp); ext x; constructor <;> simp [closure]
+  · simp only [Set.toFinset_image, Finset.coe_image, Set.coe_toFinset]
+    intro a b c d e; simp only [Set.mem_image, ne_eq, Set.disjoint_toFinset] at *
+    obtain ⟨b₁, b₂, b₃⟩ := b; obtain ⟨d₁, d₂, d₃⟩ := d; rw [Set.disjoint_left]; intro x hx hy
+    simp only [Set.mem_setOf_eq] at hx hy; rw [←hx] at hy; exact e hy.symm
 
 ----------------------------------------------------------------------------------------------------
 
@@ -134,12 +139,12 @@ theorem cball_mono (h : r₁ ≤ r₂) : cball τ r₁ v ⊆ cball τ r₂ v := 
 theorem cball_lower : ball G r v ⊆ cball τ r v := τ.subset_closure
 
 theorem cball_upper : cball τ r v ⊆ ball G (r + τ.d) v := by
-  intro p h; simp only [cball, Set.mem_setOf_eq, Set.mem_iUnion, exists_prop,
-    exists_eq_right', Tiling.closure] at h
-  obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₁
-  simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₂
-  rw [G.edist_comm] at h₁; apply le_trans (b := G.edist p q + G.edist q v) G.edist_triangle
-  rw [add_comm]; exact add_le_add h₂ h₁
+  intro p h; simp only [cball, Tiling.closure, Set.mem_image, Set.iUnion_exists, Set.biUnion_and',
+    Set.iUnion_iUnion_eq_right, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] at h
+  obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₂
+  simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₁
+  rw [G.edist_comm] at h₂; apply le_trans (b := G.edist p q + G.edist q v) G.edist_triangle
+  rw [add_comm]; exact add_le_add h₁ h₂
 
 noncomputable instance cball_fintype [G.LocallyFinite] : Fintype (cball τ r v) := τ.closure_fintype
 
@@ -423,20 +428,8 @@ theorem fudensity_at_reach [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
-theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.closure S), f x
-  = ∑ y ∈ τ.f '' S, ∑ x ∈ {v | τ.f v = y}.toFinset, f x := by
-  classical
-  rw [←Finset.sum_biUnion]
-  · apply Finset.sum_congr _ (by simp)
-    ext x; constructor <;> simp only [Set.mem_toFinset, Set.toFinset_image, Finset.mem_biUnion,
-    Finset.mem_image, Set.mem_setOf_eq, exists_eq_right'] <;> (intro; unfold closure at *; aesop)
-  · simp only [Set.toFinset_image, Finset.coe_image, Set.coe_toFinset]
-    intro a b c d e; simp only [Set.mem_image, ne_eq, Set.disjoint_toFinset] at *
-    obtain ⟨b₁, b₂, b₃⟩ := b; obtain ⟨d₁, d₂, d₃⟩ := d; rw [Set.disjoint_left]; intro x hx hy
-    simp only [Set.mem_setOf_eq] at hx hy; rw [hx] at hy; exact e hy
-
 theorem cfudensity_at_tile_le [G.LocallyFinite]
-  (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x ≤ d * τ.n) : cfudensity_at τ π v ≤ d := by
+  (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x ≤ d * τ.n) : cfudensity_at τ π v ≤ d := by
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
   apply Filter.Eventually.of_forall; intro r; unfold cball; rw [Tiling.closure_sum_eq_tile_sum]
   rw [div_le_iff₀ (by rw[←cball]; ball!)]
