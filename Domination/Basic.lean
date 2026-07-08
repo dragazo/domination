@@ -10,6 +10,17 @@ structure Policy (V : Type*) where
   f₀ : ∀ r, 0 ≤ f r := by aesop
   fₘ : ∀ r, f r ≤ m := by aesop
 
+structure Covering (G : SimpleGraph V) where
+  t : Type*
+  f : V → Set t
+  n : Nat
+  d : Nat
+  n₀ : n ≠ 0 := by norm_num
+  d₀ : d ≠ 0 := by norm_num
+  h₀ : ∀ v, (f v).Nonempty := by aesop
+  h₁ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
+  h₂ : ∀ u v, (f u ∩ f v).Nonempty → G.edist u v ≤ d := by aesop
+
 structure Tiling (G : SimpleGraph V) where
   t : Type*
   f : V → t
@@ -20,7 +31,62 @@ structure Tiling (G : SimpleGraph V) where
   h₁ : ∀ t, {v | t = f v}.ncard = n := by aesop
   h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
-variable {V : Type*} {G : SimpleGraph V} {τ : Tiling G} {π : Policy V} {S : Set V}
+variable {V : Type*} {G : SimpleGraph V} {κ : Covering G} {τ : Tiling G} {π : Policy V} {S : Set V}
+
+def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
+def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+
+----------------------------------------------------------------------------------------------------
+
+@[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
+  ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
+  exact G.edist_le_one_iff_adj_or_eq
+
+theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u := by
+  ext x; constructor <;> simp only [ball, Nat.cast_add, Nat.cast_one, Set.mem_setOf_eq,
+    Set.mem_iUnion, exists_prop]
+  · intro dvx; rw [G.edist_comm] at dvx
+    have ⟨vx, vxl⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) dvx)
+    cases vx with | nil => exists v; simp | @cons v w x vw wx =>
+    exists w; apply And.intro (by rw [G.edist_comm]; simp [G.edist_le_one_iff_adj_or_eq, vw])
+    simp only [SimpleGraph.Walk.length_cons, Nat.cast_add, Nat.cast_one] at vxl
+    rw [←ENat.add_le_add_iff_right (k := 1) (by decide)]; apply le_trans _ dvx
+    rw [←vxl, ENat.add_le_add_iff_right (by decide), G.edist_comm]; apply SimpleGraph.Walk.edist_le
+  · intro ⟨y, dyv, dxy⟩; apply le_trans (b := G.edist x y + G.edist y v) G.edist_triangle
+    exact add_le_add dxy dyv
+
+theorem ball_nonempty : (ball G r v).Nonempty := by
+  apply Set.nonempty_of_mem (x := v); simp [ball]
+
+theorem ball_mono (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
+  intro x hx; rw [ball, Set.mem_setOf_eq] at ⊢ hx; apply le_trans hx; simp [h]
+
+noncomputable instance ball_fintype [G.LocallyFinite] : Fintype (ball G r v) := by
+  apply Set.Finite.fintype; induction r generalizing v with | zero => simp [ball] | succ r ih =>
+  rw [ball_eq_union_ball]; apply Set.Finite.biUnion
+    (by rw [ball₁]; exact Set.finite_insert.mpr (Set.toFinite _)) (fun _ _ ↦ ih)
+
+----------------------------------------------------------------------------------------------------
+
+theorem ball_eq_ball_shell : ball G (r + 1) v = ball G r v ∪ shell G (r + 1) v := by
+  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_union]
+  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
+
+theorem shell_eq_ball_sub : shell G (r + 1) v = ball G (r + 1) v \ ball G r v := by
+  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_diff]
+  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
+
+theorem ball_shell_disjoint (h : r₁ < r₂) : Disjoint (ball G r₁ v) (shell G r₂ v) := by
+  intro s; simp only [Set.le_eq_subset, Set.bot_eq_empty, Set.subset_empty_iff]; intro a b
+  rw [Set.eq_empty_iff_forall_notMem]; intro x hx
+  have gx := hx; apply a at hx; apply b at gx; simp only [ball, shell, Set.mem_setOf_eq] at hx gx
+  cases hd : G.edist x v with
+  | top => rw [hd] at hx; contradiction
+  | coe => rw [hd] at hx gx; norm_cast at hx gx; rw [gx, ←not_lt] at hx; contradiction
+
+noncomputable instance shell_fintype [G.LocallyFinite] : Fintype (shell G r v) := by
+  apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (Set.toFinite _)
+  rw [ball, shell, Set.setOf_subset_setOf]; intros; simp [*]
 
 ----------------------------------------------------------------------------------------------------
 
@@ -36,6 +102,48 @@ theorem Policy.sum_nonneg : 0 ≤ ∑ x ∈ s, π.f x := by simp [Finset.sum_non
 theorem Policy.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, π.f x) ≤ π.m * S.ncard := by
   rw [Set.ncard_eq_toFinset_card' _, mul_comm, ←nsmul_eq_mul]
   apply Finset.sum_le_card_nsmul; simp [π.fₘ]
+
+----------------------------------------------------------------------------------------------------
+
+noncomputable instance Covering.fintype {t : κ.t} : Fintype {v | t ∈ κ.f v} := by
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [κ.h₁ t]; exact κ.n₀
+
+def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, n := 1, d := 1 }
+
+def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
+  ⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}
+
+@[simp] theorem Covering.id_closure : (Covering.id G).closure S = S := by
+  ext x; constructor <;> simp only [closure, id, Set.sUnion_image, Set.biUnion_of_singleton,
+    Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] <;> intro h
+  · obtain ⟨_, a, b⟩ := h; exact b ▸ a
+  · exists x
+
+theorem Covering.subset_closure : S ⊆ κ.closure S := by
+  intro x h; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+    Set.biUnion_and', Set.mem_setOf_eq]; exists x; simp only [h, and_self, true_and]; apply κ.h₀
+
+theorem Covering.closure_subset : κ.closure S ⊆ ⋃ x ∈ S, ball G κ.d x := by
+  intro x hx; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+    Set.biUnion_and', Set.mem_setOf_eq, ball] at ⊢ hx; obtain ⟨y, h₁, t, h₃, h₄⟩ := hx
+  exists y; apply And.intro h₁; apply κ.h₂; exists t
+
+theorem Covering.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closure S₂ := by
+  intro x; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+    Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp]
+  intro a b c d e; exists a; apply And.intro (h b); exists c
+
+theorem Covering.closure_mem (h : x ∈ S) : x ∈ κ.closure S := by
+  simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+  Set.biUnion_and', Set.mem_setOf_eq]; exists x; apply And.intro h; simp only [and_self]; apply κ.h₀
+
+theorem Covering.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
+  apply Set.Nonempty.mono (s := S) κ.subset_closure h
+
+noncomputable instance Covering.closure_fintype [G.LocallyFinite] [Fintype S]
+  : Fintype (κ.closure S) := by
+  apply Set.Finite.fintype; apply Set.Finite.subset (s := ⋃ x ∈ S, ball G κ.d x) _ κ.closure_subset
+  apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ Set.toFinite _)
 
 ----------------------------------------------------------------------------------------------------
 
@@ -92,42 +200,13 @@ theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ 
 
 ----------------------------------------------------------------------------------------------------
 
-def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
-def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
+
+
+----------------------------------------------------------------------------------------------------
+
+----------------------------------------------------------------------------------------------------
 
 def cball (τ : Tiling G) (r : Nat) (v : V) := τ.closure (ball G r v)
-
-----------------------------------------------------------------------------------------------------
-
-@[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
-  ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
-  exact G.edist_le_one_iff_adj_or_eq
-
-theorem ball_eq_union_ball : ball G (r + 1) v = ⋃ u ∈ ball G 1 v, ball G r u := by
-  ext x; constructor <;> simp only [ball, Nat.cast_add, Nat.cast_one, Set.mem_setOf_eq,
-    Set.mem_iUnion, exists_prop]
-  · intro dvx; rw [G.edist_comm] at dvx
-    have ⟨vx, vxl⟩ := G.exists_walk_of_edist_ne_top (ne_top_of_le_ne_top (by tauto) dvx)
-    cases vx with | nil => exists v; simp | @cons v w x vw wx =>
-    exists w; apply And.intro (by rw [G.edist_comm]; simp [G.edist_le_one_iff_adj_or_eq, vw])
-    simp only [SimpleGraph.Walk.length_cons, Nat.cast_add, Nat.cast_one] at vxl
-    rw [←ENat.add_le_add_iff_right (k := 1) (by decide)]; apply le_trans _ dvx
-    rw [←vxl, ENat.add_le_add_iff_right (by decide), G.edist_comm]; apply SimpleGraph.Walk.edist_le
-  · intro ⟨y, dyv, dxy⟩; apply le_trans (b := G.edist x y + G.edist y v) G.edist_triangle
-    exact add_le_add dxy dyv
-
-theorem ball_nonempty : (ball G r v).Nonempty := by
-  apply Set.nonempty_of_mem (x := v); simp [ball]
-
-theorem ball_mono (h : r₁ ≤ r₂) : ball G r₁ v ⊆ ball G r₂ v := by
-  intro x hx; rw [ball, Set.mem_setOf_eq] at ⊢ hx; apply le_trans hx; simp [h]
-
-noncomputable instance ball_fintype [G.LocallyFinite] : Fintype (ball G r v) := by
-  apply Set.Finite.fintype; induction r generalizing v with | zero => simp [ball] | succ r ih =>
-  rw [ball_eq_union_ball]; apply Set.Finite.biUnion
-    (by rw [ball₁]; exact Set.finite_insert.mpr (Set.toFinite _)) (fun _ _ ↦ ih)
-
-----------------------------------------------------------------------------------------------------
 
 theorem cball_eq_union_cball : cball τ (r + 1) v = ⋃ u ∈ ball G 1 v, cball τ r u := by
   unfold cball; rw [τ.biUnion_closure_eq, ball_eq_union_ball]
@@ -150,25 +229,7 @@ noncomputable instance cball_fintype [G.LocallyFinite] : Fintype (cball τ r v) 
 
 ----------------------------------------------------------------------------------------------------
 
-theorem ball_eq_ball_shell : ball G (r + 1) v = ball G r v ∪ shell G (r + 1) v := by
-  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_union]
-  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
 
-theorem shell_eq_ball_sub : shell G (r + 1) v = ball G (r + 1) v \ ball G r v := by
-  ext x; simp only [ball, shell, Set.mem_setOf_eq, Set.mem_diff]
-  cases G.edist x v with | top => simp; tauto | coe => norm_cast; omega
-
-theorem ball_shell_disjoint (h : r₁ < r₂) : Disjoint (ball G r₁ v) (shell G r₂ v) := by
-  intro s; simp only [Set.le_eq_subset, Set.bot_eq_empty, Set.subset_empty_iff]; intro a b
-  rw [Set.eq_empty_iff_forall_notMem]; intro x hx
-  have gx := hx; apply a at hx; apply b at gx; simp only [ball, shell, Set.mem_setOf_eq] at hx gx
-  cases hd : G.edist x v with
-  | top => rw [hd] at hx; contradiction
-  | coe => rw [hd] at hx gx; norm_cast at hx gx; rw [gx, ←not_lt] at hx; contradiction
-
-noncomputable instance shell_fintype [G.LocallyFinite] : Fintype (shell G r v) := by
-  apply Set.Finite.fintype; apply Set.Finite.subset (s := ball G r v) (Set.toFinite _)
-  rw [ball, shell, Set.setOf_subset_setOf]; intros; simp [*]
 
 ----------------------------------------------------------------------------------------------------
 
