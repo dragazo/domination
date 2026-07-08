@@ -64,6 +64,10 @@ theorem Tiling.closure_mono (h : S₁ ⊆ S₂) : τ.closure S₁ ⊆ τ.closure
   intro x; simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
     exists_and_right, exists_eq_right']; intro ⟨y, hy₁, hy₂⟩; exists y; simp [hy₁, h hy₂]
 
+theorem Tiling.closure_mem (h : x ∈ S) : x ∈ τ.closure S := by
+  simp only [closure, Set.mem_setOf_eq, Set.iUnion_exists, Set.mem_iUnion, exists_prop,
+    exists_and_right, exists_eq_right']; exists x
+
 theorem Tiling.closure_nonempty (h : S.Nonempty) : (τ.closure S).Nonempty := by
   exact Set.Nonempty.mono (s := S) τ.subset_closure h
 
@@ -71,6 +75,9 @@ noncomputable instance Tiling.closure_fintype [Fintype S] : Fintype (τ.closure 
   apply Set.Finite.fintype; unfold closure; apply Set.Finite.biUnion _ (fun _ _ ↦ Set.toFinite _)
   simp_rw [Set.mem_setOf_eq, Set.setOf_exists]; apply Set.Finite.iUnion (t := S) (Set.toFinite _)
   <;> (intro _ h; simp [h])
+
+noncomputable instance Tiling.tile_image_fintype [Fintype S] : Fintype (τ.f '' S) := by
+  apply Set.Finite.fintype; apply Set.Finite.image; exact Set.toFinite _
 
 @[simp] theorem Tiling.biUnion_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, τ.closure (f x) = τ.closure (⋃ x ∈ S, f x) := by
@@ -223,8 +230,9 @@ theorem slow_growth_at_ext [G.LocallyFinite]
   conv_rhs => arg 1; ext r; repeat rw [←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
   rw [←slow_tiling_at, ←slow_tiling_at]; exact slow_tiling_at_ext _ _
 
-theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂ := by omega)
+theorem slow_tiling_at_iff [G.LocallyFinite]
   : slow_tiling_at τ v e₁ e₂ ↔ slow_growth_at G v e₁ e₂ := by
+  cases Decidable.em (e₁ = e₂) with | inl h => ball! [h, slow_tiling_at, slow_growth_at] | inr =>
   constructor <;> intro h
   · unfold slow_growth_at; rw [←Filter.tendsto_add_atTop_iff_nat τ.d]
     simp_rw [add_assoc, add_comm τ.d, ←add_assoc]
@@ -248,6 +256,10 @@ theorem slow_tiling_at_iff [G.LocallyFinite] (h₁₂ : e₁ ≠ e₂ := by omeg
       cases Decidable.em (e₁ + τ.d = e₂) with | inl t => ball! [t, slow_growth_at] | inr =>
       rw [slow_growth_at_ext e₁ e₂]; exact h
     all_goals rw [Pi.le_def]; intro r; apply div_le_div₀ <;> ball!
+
+theorem slow_tiling_at_iff' [G.LocallyFinite] {τ₁ τ₂ : Tiling G}
+  : slow_tiling_at τ₁ v e₁ e₂ ↔ slow_tiling_at τ₂ v e₁ e₂ := by
+  rw [slow_tiling_at_iff, ←slow_tiling_at_iff (τ := τ₂)]
 
 theorem slow_tiling_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (st : slow_tiling_at τ v := by assumption)
@@ -324,8 +336,8 @@ theorem cball_div_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real :
   cases Decidable.em (e₁ = e₂) with | inl h => ball! [h] | inr h =>
   rw [←slow_tiling_at, slow_tiling_at_ext]; assumption
 
-theorem cball_fdiv_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real := 1)
-  (hε : 0 < ε := by omega) (st : slow_tiling_at τ v := by assumption) : ∀ᶠ r in Filter.atTop,
+theorem cball_fdiv_eventually_le [G.LocallyFinite] (ε : Real := 1)
+  (hε : 0 < ε := by norm_num) (st : slow_tiling_at τ v := by assumption) : ∀ᶠ r in Filter.atTop,
   (∑ x ∈ (cball τ (r + e₁) v), π.f x) / (cball τ (r + e₂) v).ncard ≤ π.m + ε := by
   apply Filter.Eventually.mono (cball_div_eventually_le e₁ e₂ (ε / π.m) (div_pos hε π.hm) (τ := τ))
   intro r q; apply le_trans (b := π.m * (↑(cball τ (r + e₁) v).ncard / ↑(cball τ (r + e₂) v).ncard))
@@ -351,7 +363,7 @@ theorem cfudensity_at_ext [G.LocallyFinite]
   · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
     cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl t => ball! [t] | inr t =>
     rw [←slow_tiling_at, slow_tiling_at_ext]; assumption
-  · apply cball_fdiv_eventually_le <;> simp [*]
+  · exact cball_fdiv_eventually_le
 
 theorem fudensity_at_ext [G.LocallyFinite]
   (e₃ e₄ : Nat := 0) (sg : slow_growth_at G v := by assumption)
@@ -375,13 +387,13 @@ theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_tiling_at τ v := by assum
     · exists π.m + 1; rw [Filter.eventually_map]; dsimp
       have cvt {r} : (ball G r v).toFinset = (cball (Tiling.id G) r v).toFinset := by ball! [cball]
       conv => arg 1; ext r; rw [cvt, ←Tiling.id_closure (G := G) (S := ball G _ v), ←cball]
-      apply cball_fdiv_eventually_le <;> simp [*]
+      exact cball_fdiv_eventually_le 1 (by norm_num) (by assumption)
   · rw [fudensity_at_ext e₁ (e₂ + τ.d)]; apply Filter.limsup_le_limsup
     · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
       · apply Finset.sum_le_sum_of_subset_of_nonneg <;> ball! [←add_assoc, π.f₀]
       · ball! [←add_assoc]
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
-    · exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le <;> simp [*]
+    · exists π.m + 1; rw [Filter.eventually_map]; exact cball_fdiv_eventually_le
 
 theorem cfudensity_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (st : slow_tiling_at τ v := by assumption)
@@ -409,33 +421,27 @@ theorem fudensity_at_reach [G.LocallyFinite]
   rw [←slow_tiling_at_iff (τ := Tiling.id G)] at sg; have sg' := slow_tiling_at_reach r sg
   (repeat rw [←cfudensity_at_eq (τ := Tiling.id G)]); rw [cfudensity_at_reach]
 
+----------------------------------------------------------------------------------------------------
 
+theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.closure S), f x
+  = ∑ y ∈ τ.f '' S, ∑ x ∈ {v | τ.f v = y}.toFinset, f x := by
+  classical
+  rw [←Finset.sum_biUnion]
+  · apply Finset.sum_congr _ (by simp)
+    ext x; constructor <;> simp only [Set.mem_toFinset, Set.toFinset_image, Finset.mem_biUnion,
+    Finset.mem_image, Set.mem_setOf_eq, exists_eq_right'] <;> (intro; unfold closure at *; aesop)
+  · simp only [Set.toFinset_image, Finset.coe_image, Set.coe_toFinset]
+    intro a b c d e; simp only [Set.mem_image, ne_eq, Set.disjoint_toFinset] at *
+    obtain ⟨b₁, b₂, b₃⟩ := b; obtain ⟨d₁, d₂, d₃⟩ := d; rw [Set.disjoint_left]; intro x hx hy
+    simp only [Set.mem_setOf_eq] at hx hy; rw [hx] at hy; exact e hy
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-theorem cfudensity_at_tiling [G.LocallyFinite]
-  (d : Real) (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x = d / τ.n)
-  (sg : slow_growth_at G v := by assumption)
-  : cfudensity_at τ π v = d := by
-  sorry
+theorem cfudensity_at_tile_le [G.LocallyFinite]
+  (h : ∀ t, ∑ x ∈ {v | τ.f v = t}.toFinset, π.f x ≤ d * τ.n) : cfudensity_at τ π v ≤ d := by
+  apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
+  apply Filter.Eventually.of_forall; intro r; unfold cball; rw [Tiling.closure_sum_eq_tile_sum]
+  rw [div_le_iff₀ (by rw[←cball]; ball!)]
+  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum]
+  rw [Finset.mul_sum, Tiling.closure_sum_eq_tile_sum]
+  apply Finset.sum_le_sum; intro t ht
+  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card', τ.h₁]
+  apply h
