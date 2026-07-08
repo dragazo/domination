@@ -17,9 +17,9 @@ structure Covering (G : SimpleGraph V) where
   d : Nat
   n₀ : n ≠ 0 := by norm_num
   d₀ : d ≠ 0 := by norm_num
-  h₀ : ∀ v, (f v).Nonempty := by aesop
-  h₁ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
-  h₂ : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
+  h₁ : ∀ v, (f v).Nonempty := by aesop
+  h₂ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
+  h₃ : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
 structure Tiling (G : SimpleGraph V) where
   t : Type*
@@ -28,8 +28,8 @@ structure Tiling (G : SimpleGraph V) where
   d : Nat
   n₀ : n ≠ 0 := by norm_num
   d₀ : d ≠ 0 := by norm_num
-  h₁ : ∀ t, {v | t = f v}.ncard = n := by aesop
-  h₂ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
+  h₂ : ∀ t, {v | t = f v}.ncard = n := by aesop
+  h₃ : ∀ u v, f u = f v → G.edist u v ≤ d := by aesop
 
 variable {V : Type*} {G : SimpleGraph V} {κ : Covering G} {τ : Tiling G} {π : Policy V} {S : Set V}
 
@@ -106,7 +106,7 @@ theorem Policy.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, π.f x) ≤ π.m * S.n
 ----------------------------------------------------------------------------------------------------
 
 noncomputable instance Covering.fintype {t : κ.t} : Fintype {v | t ∈ κ.f v} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [κ.h₁ t]; exact κ.n₀
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [κ.h₂ t]; exact κ.n₀
 
 def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, n := 1, d := 1 }
 
@@ -121,12 +121,12 @@ def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
 
 theorem Covering.subset_closure : S ⊆ κ.closure S := by
   intro x h; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Set.mem_setOf_eq]; exists x; simp only [h, and_self, true_and]; apply κ.h₀
+    Set.biUnion_and', Set.mem_setOf_eq]; exists x; simp only [h, and_self, true_and]; apply κ.h₁
 
 theorem Covering.closure_subset : κ.closure S ⊆ ⋃ x ∈ S, ball G κ.d x := by
   intro x hx; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
     Set.biUnion_and', Set.mem_setOf_eq, ball] at ⊢ hx; obtain ⟨y, h₁, t, h₃, h₄⟩ := hx
-  exists y; apply And.intro h₁; apply κ.h₂; exists t
+  exists y; apply And.intro h₁; apply κ.h₃; exists t
 
 theorem Covering.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closure S₂ := by
   intro x; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
@@ -135,7 +135,7 @@ theorem Covering.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closu
 
 theorem Covering.closure_mem (h : x ∈ S) : x ∈ κ.closure S := by
   simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-  Set.biUnion_and', Set.mem_setOf_eq]; exists x; apply And.intro h; simp only [and_self]; apply κ.h₀
+  Set.biUnion_and', Set.mem_setOf_eq]; exists x; apply And.intro h; simp only [and_self]; apply κ.h₁
 
 theorem Covering.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
   apply Set.Nonempty.mono (s := S) κ.subset_closure h
@@ -154,14 +154,14 @@ def Tiling.toCovering (τ : Tiling G) : Covering G := {
   d := τ.d
   n₀ := τ.n₀
   d₀ := τ.d₀
-  h₁ := by simp only [Set.mem_singleton_iff]; exact τ.h₁
-  h₂ := by simp only [Set.inter_singleton_nonempty, Set.mem_singleton_iff]; exact τ.h₂
+  h₂ := by simp only [Set.mem_singleton_iff]; exact τ.h₂
+  h₃ := by simp only [Set.inter_singleton_nonempty, Set.mem_singleton_iff]; exact τ.h₃
 }
 
 instance Tiling.coeCovering : Coe (Tiling G) (Covering G) where coe := Tiling.toCovering
 
 noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | t = τ.f v} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
+  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₂ t]; exact τ.n₀
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ v, n := 1, d := 1 }
 
@@ -233,7 +233,7 @@ theorem cball_lower : ball G r v ⊆ cball τ r v := τ.subset_closure
 theorem cball_upper : cball τ r v ⊆ ball G (r + τ.d) v := by
   intro p h; simp only [cball, Tiling.closure, Set.mem_image, Set.iUnion_exists, Set.biUnion_and',
     Set.iUnion_iUnion_eq_right, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] at h
-  obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₂ at h₂
+  obtain ⟨q, h₁, h₂⟩ := h; apply τ.h₃ at h₂
   simp only [ball, Nat.cast_add, Set.mem_setOf_eq] at ⊢ h₁
   rw [G.edist_comm] at h₂; apply le_trans (b := G.edist p q + G.edist q v) G.edist_triangle
   rw [add_comm]; exact add_le_add h₁ h₂
@@ -511,7 +511,7 @@ theorem cfudensity_at_tile_le [G.LocallyFinite]
   unfold cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [τ.h₁]; apply h
+  rw [τ.h₂]; apply h
 
 theorem cfudensity_at_tile_ge [G.LocallyFinite]
   (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x ≥ d * τ.n)
@@ -524,7 +524,7 @@ theorem cfudensity_at_tile_ge [G.LocallyFinite]
   unfold cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [τ.h₁]; apply h
+  rw [τ.h₂]; apply h
 
 theorem cfudensity_at_tile_eq [G.LocallyFinite]
   (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x = d * τ.n)
