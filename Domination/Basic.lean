@@ -19,7 +19,7 @@ structure Covering (G : SimpleGraph V) where
   d₀ : d ≠ 0 := by norm_num
   h₀ : ∀ v, (f v).Nonempty := by aesop
   h₁ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
-  h₂ : ∀ u v, (f u ∩ f v).Nonempty → G.edist u v ≤ d := by aesop
+  h₂ : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
 structure Tiling (G : SimpleGraph V) where
   t : Type*
@@ -146,6 +146,19 @@ noncomputable instance Covering.closure_fintype [G.LocallyFinite] [Fintype S]
   apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ Set.toFinite _)
 
 ----------------------------------------------------------------------------------------------------
+
+def Tiling.toCovering (τ : Tiling G) : Covering G := {
+  t := τ.t
+  f := fun v ↦ {τ.f v}
+  n := τ.n
+  d := τ.d
+  n₀ := τ.n₀
+  d₀ := τ.d₀
+  h₁ := by simp only [Set.mem_singleton_iff]; exact τ.h₁
+  h₂ := by simp only [Set.inter_singleton_nonempty, Set.mem_singleton_iff]; exact τ.h₂
+}
+
+instance Tiling.coeCovering : Coe (Tiling G) (Covering G) where coe := Tiling.toCovering
 
 noncomputable instance Tiling.fintype {t : τ.t} : Fintype {v | t = τ.f v} := by
   apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [τ.h₁ t]; exact τ.n₀
@@ -492,10 +505,30 @@ theorem fudensity_at_reach [G.LocallyFinite]
 theorem cfudensity_at_tile_le [G.LocallyFinite]
   (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x ≤ d * τ.n) : cfudensity_at τ π v ≤ d := by
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
-  apply Filter.Eventually.of_forall; intro r; unfold cball; rw [Tiling.closure_sum_eq_tile_sum]
-  rw [div_le_iff₀ (by rw[←cball]; ball!)]
-  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum]
-  rw [Finset.mul_sum, Tiling.closure_sum_eq_tile_sum]
+  apply Filter.Eventually.of_forall; intro r
+  rw [div_le_iff₀ (by ball!)]
+  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
+  unfold cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
   apply Finset.sum_le_sum; intro t ht
-  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card', τ.h₁]
-  apply h
+  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
+  rw [τ.h₁]; apply h
+
+theorem cfudensity_at_tile_ge [G.LocallyFinite]
+  (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x ≥ d * τ.n)
+  (st : slow_tiling_at τ v := by assumption) : cfudensity_at τ π v ≥ d := by
+  apply Filter.le_limsup_of_frequently_le _
+     (by exists π.m + 1; rw [Filter.eventually_map]; exact cball_fdiv_eventually_le)
+  apply Filter.Frequently.of_forall; intro r
+  rw [le_div_iff₀ (by ball!)]
+  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
+  unfold cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
+  apply Finset.sum_le_sum; intro t ht
+  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
+  rw [τ.h₁]; apply h
+
+theorem cfudensity_at_tile_eq [G.LocallyFinite]
+  (h : ∀ t, ∑ x ∈ {v | t = τ.f v}.toFinset, π.f x = d * τ.n)
+  (st : slow_tiling_at τ v := by assumption) : cfudensity_at τ π v = d := by
+  apply le_antisymm
+  · apply cfudensity_at_tile_le; intro; apply le_of_eq; rw [h]
+  · apply cfudensity_at_tile_ge _; intro; apply le_of_eq; rw [h]
