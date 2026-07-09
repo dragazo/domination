@@ -158,19 +158,19 @@ def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Covering.id G, by unfold Cove
   · intro a b c d e f g h i; refine ⟨a, b, c, d, ?_⟩; rw [i, ←h]; exact f
   · intro a b c d e; exact ⟨a, b, c, d, x, e, c, e, e⟩
 
-theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.1.closure S), f x
-  = ∑ y ∈ (⋃₀ (τ.1.f '' S)).toFinset, ∑ x ∈ {v | y ∈ τ.1.f v}.toFinset, f x := by
+theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real}
+  : ∑ x ∈ (τ.1.closure S), f x
+  = ∑ t ∈ (⋃ y ∈ S, τ.1.f y).toFinset, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, f x := by
   classical
   rw [←Finset.sum_biUnion]
-  · apply Finset.sum_congr _ (by simp); ext x; constructor <;> intro h <;> simp only [
-    Covering.closure, Set.sUnion_image, Set.mem_iUnion, τ.2, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Set.mem_toFinset, Set.mem_setOf_eq, Finset.mem_biUnion] at *
+  · apply Finset.sum_congr _ (by simp); ext x; constructor <;> intro h <;> simp only [exists_prop,
+    Covering.closure, τ.2, Set.mem_toFinset, Set.mem_iUnion, Finset.mem_biUnion] at *
     · obtain ⟨a, b, c, d, e⟩ := h; exact ⟨c, ⟨a, b, d⟩, e⟩
     · obtain ⟨a, ⟨b, c, d⟩, e⟩ := h; exact ⟨b, c, a, d, e⟩
-  · simp only [Set.sUnion_image, Set.coe_toFinset, τ.2]; intro a b c d e
+  · simp only [Set.coe_toFinset]; intro a b c d e
     simp only [Set.mem_iUnion, τ.2, exists_prop, ne_eq, Set.disjoint_toFinset] at *
     obtain ⟨b₁, b₂, b₃⟩ := b; obtain ⟨d₁, d₂, d₃⟩ := d; rw [Set.disjoint_left]; intro x hx hy
-    simp only [Set.mem_setOf_eq] at hx hy; rw [hx] at hy; rw [Set.singleton_eq_singleton_iff] at hy
+    simp only [Set.mem_setOf_eq] at *; rw [hx] at hy; rw [Set.singleton_eq_singleton_iff] at hy
     contradiction
 
 ----------------------------------------------------------------------------------------------------
