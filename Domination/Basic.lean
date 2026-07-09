@@ -22,12 +22,7 @@ structure Covering (G : SimpleGraph V) where
   h₃ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
   h₄ : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
-structure Tiling (G : SimpleGraph V) extends Covering G where
-  h₀ : ∀ t v, t ∈ f v ↔ f v = {t} := by aesop
-
-instance Tiling.coeCovering : Coe (Tiling G) (Covering G) where coe := Tiling.toCovering
-
-attribute [simp] Tiling.h₀
+def Tiling (G : SimpleGraph V) := { κ : Covering G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
 
 variable {V : Type*} {G : SimpleGraph V} {π : Policy V} {S : Set V}
 variable {κ κ₁ κ₂ : Covering G} {τ τ₁ τ₂ : Tiling G}
@@ -154,25 +149,25 @@ noncomputable instance Covering.closure_fintype [Fintype S] : Fintype (κ.closur
 
 ----------------------------------------------------------------------------------------------------
 
-def Tiling.id (G : SimpleGraph V) : Tiling G := { t := V, f := fun v ↦ {v}, n := 1, d := 1 }
+def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Covering.id G, by unfold Covering.id; aesop⟩
 
-@[simp] theorem Tiling.closure_idemp : τ.closure (τ.closure S) = τ.closure S := by
+@[simp] theorem Tiling.closure_idemp : τ.1.closure (τ.1.closure S) = τ.1.closure S := by
   ext x; constructor <;> simp only [Covering.closure, Set.sUnion_image, Set.mem_iUnion, exists_prop,
-    Set.iUnion_exists, Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp, τ.h₀]
+    Set.iUnion_exists, Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp, τ.2]
   · intro a b c d e f g h i; refine ⟨a, b, c, d, ?_⟩; rw [i, ←h]; exact f
   · intro a b c d e; exact ⟨a, b, c, d, x, e, c, e, e⟩
 
-theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.closure S), f x
-  = ∑ y ∈ (⋃₀ (τ.f '' S)).toFinset, ∑ x ∈ {v | y ∈ τ.f v}.toFinset, f x := by
+theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (τ.1.closure S), f x
+  = ∑ y ∈ (⋃₀ (τ.1.f '' S)).toFinset, ∑ x ∈ {v | y ∈ τ.1.f v}.toFinset, f x := by
   classical
   rw [←Finset.sum_biUnion]
   · apply Finset.sum_congr _ (by simp); ext x; constructor <;> intro h <;> simp only [
-    Covering.closure, Set.sUnion_image, Set.mem_iUnion, τ.h₀, exists_prop, Set.iUnion_exists,
+    Covering.closure, Set.sUnion_image, Set.mem_iUnion, τ.2, exists_prop, Set.iUnion_exists,
     Set.biUnion_and', Set.mem_toFinset, Set.mem_setOf_eq, Finset.mem_biUnion] at *
     · obtain ⟨a, b, c, d, e⟩ := h; exact ⟨c, ⟨a, b, d⟩, e⟩
     · obtain ⟨a, ⟨b, c, d⟩, e⟩ := h; exact ⟨b, c, a, d, e⟩
-  · simp only [Set.sUnion_image, Set.coe_toFinset, τ.h₀]; intro a b c d e
-    simp only [Set.mem_iUnion, τ.h₀, exists_prop, ne_eq, Set.disjoint_toFinset] at *
+  · simp only [Set.sUnion_image, Set.coe_toFinset, τ.2]; intro a b c d e
+    simp only [Set.mem_iUnion, τ.2, exists_prop, ne_eq, Set.disjoint_toFinset] at *
     obtain ⟨b₁, b₂, b₃⟩ := b; obtain ⟨d₁, d₂, d₃⟩ := d; rw [Set.disjoint_left]; intro x hx hy
     simp only [Set.mem_setOf_eq] at hx hy; rw [hx] at hy; rw [Set.singleton_eq_singleton_iff] at hy
     contradiction
@@ -466,8 +461,8 @@ theorem fudensity_at_reach [G.LocallyFinite]
 ----------------------------------------------------------------------------------------------------
 
 theorem cfudensity_at_tile_le [G.LocallyFinite]
-  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.f v}.toFinset, π.f x ≤ d * τ.n)
-  : cfudensity_at τ.toCovering π v ≤ d := by
+  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, π.f x ≤ d * τ.1.n)
+  : cfudensity_at τ.1 π v ≤ d := by
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
   apply Filter.Eventually.of_forall; intro r
   rw [div_le_iff₀ (by ball!)]
@@ -475,12 +470,12 @@ theorem cfudensity_at_tile_le [G.LocallyFinite]
   unfold Covering.cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [τ.h₃]; apply h
+  rw [τ.1.h₃]; apply h
 
 theorem cfudensity_at_tile_ge [G.LocallyFinite]
-  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.f v}.toFinset, π.f x ≥ d * τ.n)
-  (st : slow_covering_at τ.toCovering v := by assumption)
-  : cfudensity_at τ.toCovering π v ≥ d := by
+  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, π.f x ≥ d * τ.1.n)
+  (st : slow_covering_at τ.1 v := by assumption)
+  : cfudensity_at τ.1 π v ≥ d := by
   apply Filter.le_limsup_of_frequently_le _
      (by exists π.m + 1; rw [Filter.eventually_map]; exact cball_fdiv_eventually_le)
   apply Filter.Frequently.of_forall; intro r
@@ -489,12 +484,12 @@ theorem cfudensity_at_tile_ge [G.LocallyFinite]
   unfold Covering.cball; rw [τ.closure_sum_eq_tile_sum, τ.closure_sum_eq_tile_sum]
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [τ.h₃]; apply h
+  rw [τ.1.h₃]; apply h
 
 theorem cfudensity_at_tile_eq [G.LocallyFinite]
-  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.f v}.toFinset, π.f x = d * τ.n)
-  (st : slow_covering_at τ.toCovering v := by assumption)
-  : cfudensity_at τ.toCovering π v = d := by
+  (h : ∀ t, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, π.f x = d * τ.1.n)
+  (st : slow_covering_at τ.1 v := by assumption)
+  : cfudensity_at τ.1 π v = d := by
   apply le_antisymm
   · apply cfudensity_at_tile_le; intro; apply le_of_eq; rw [h]
   · apply cfudensity_at_tile_ge _; intro; apply le_of_eq; rw [h]
