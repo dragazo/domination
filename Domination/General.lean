@@ -19,3 +19,13 @@ theorem limsup_mul_eq {f g : Nat → Real}
     apply le_limsup_mul _ (by exists m₂) _ (by exists m₁)
     · rw [Filter.frequently_atTop]; intro r; exists r; simp [p₂]
     · rw [Filter.EventuallyLE, Filter.eventually_atTop]; simp [p₁]
+
+theorem sum_biUnion_le [DecidableEq β] {s : Finset α} {g : α → Finset β} {f : β → Real}
+  (hf : ∀ x, 0 ≤ f x) : ∑ x ∈ s.biUnion g, f x ≤ ∑ t ∈ s, ∑ x ∈ g t, f x := by
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp
+  | insert t s ht ih =>
+    simp only [Finset.biUnion_insert, not_false_eq_true, Finset.sum_insert, ht]
+    apply le_trans (b := ∑ x ∈ g t, f x + ∑ x ∈ s.biUnion g, f x) _ (add_le_add_right ih _)
+    rw [←Finset.sum_union_inter]; apply le_add_of_nonneg_right; apply Finset.sum_nonneg; aesop

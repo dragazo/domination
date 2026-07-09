@@ -102,35 +102,29 @@ noncomputable instance Covering.fintype {t : κ.t} : Fintype {v | t ∈ κ.f v} 
 
 def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, d := 1 }
 
--- def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
---   ⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}
-
 def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
-  ⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}
+  ⋃ y ∈ S, ⋃ t ∈ κ.f y, {x | t ∈ κ.f x}
 
 @[simp] theorem Covering.id_closure : (Covering.id G).closure S = S := by
-  ext x; constructor <;> simp only [closure, id, Set.sUnion_image, Set.biUnion_of_singleton,
-    Set.mem_iUnion, Set.mem_setOf_eq, exists_prop] <;> intro h
-  · obtain ⟨_, a, b⟩ := h; exact b ▸ a
-  · exists x
+  ext x; constructor <;> simp only [closure, id, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]
+  · intro ⟨a, b, c, d, e⟩; rw [←e, d]; exact b
+  · intro h; exact ⟨x, h, x, rfl, rfl⟩
 
 theorem Covering.subset_closure : S ⊆ κ.closure S := by
-  intro x h; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Set.mem_setOf_eq]; exists x; simp only [h, and_self, true_and]; apply κ.h₁
+  intro x h; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]
+  refine ⟨x, h, ?_⟩; simp only [and_self]; apply κ.h₁
 
 theorem Covering.closure_subset : κ.closure S ⊆ ⋃ x ∈ S, ball G κ.d x := by
-  intro x hx; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Set.mem_setOf_eq, ball] at ⊢ hx; obtain ⟨y, h₁, t, h₃, h₄⟩ := hx
-  exists y; apply And.intro h₁; apply κ.h₄; exists t
+  intro x; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, ball, and_imp,
+    forall_exists_index]; intro a b c d e; refine ⟨a, b, ?_⟩; apply κ.h₄; exists c
 
 theorem Covering.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closure S₂ := by
-  intro x; simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp]
-  intro a b c d e; exists a; apply And.intro (h b); exists c
+  intro x; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, forall_exists_index,
+    and_imp]; intro a b c d e; refine ⟨a, h b, c, d, e⟩
 
 theorem Covering.closure_mem (h : x ∈ S) : x ∈ κ.closure S := by
-  simp only [closure, Set.sUnion_image, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-  Set.biUnion_and', Set.mem_setOf_eq]; exists x; apply And.intro h; simp only [and_self]; apply κ.h₁
+  simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]; refine ⟨x, h, ?_⟩
+  simp only [and_self]; apply κ.h₁
 
 theorem Covering.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
   apply Set.Nonempty.mono (s := S) κ.subset_closure h
@@ -138,68 +132,29 @@ theorem Covering.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := 
 theorem Covering.biUnion_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, κ.closure (f x) = κ.closure (⋃ x ∈ S, f x) := by simp [Covering.closure]
 
-noncomputable instance Covering.tiles_fintype [Fintype S] : Fintype (⋃₀ (κ.f '' S)) := by
-  apply Set.Finite.fintype; apply Set.Finite.sUnion
-  · apply Set.toFinite
-  · intro t ht; simp only [Set.mem_image] at ht; obtain ⟨y, h₁, h₂⟩ := ht; rw [←h₂]; apply κ.h₂
+noncomputable instance Covering.tiles_fintype [Fintype S] : Fintype (⋃ y ∈ S, κ.f y) := by
+  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.h₂ _)
 
-noncomputable instance Covering.closure_fintype' [Fintype S]
-  : Fintype (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}) := by
-  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.h₃ _)
+noncomputable instance Covering.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
+  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _); intro _ _
+  apply Set.Finite.biUnion (κ.h₂ _) (fun _ _ ↦ κ.h₃ _)
 
-noncomputable instance Covering.closure_fintype [Fintype S]
-  : Fintype (κ.closure S) := κ.closure_fintype'
-
-#check Finset.sum_le_sum_of_subset
-#check Finset.sum_le_sum
-#check Finset.sum_biUnion
-#check Finset.sum_sigma
-#check Finset.sum_sigma'
-#check Finset.sum_biUnion
-
-theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (κ.closure S), f x
-  ≤ ∑ y ∈ (⋃₀ (κ.f '' S)).toFinset, ∑ x ∈ {v | y ∈ κ.f v}.toFinset, f x := by
-  -- classical
-  unfold closure;
-
-  -- have t : (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}).toFinset = (⋃ t ∈ (⋃₀ (κ.f '' S)).toFinset, {x | t ∈ κ.f x}).toFinset := by
-  --   sorry
-  conv_lhs => arg 1; rw [t]
-
-  induction h : (⋃₀ (κ.f '' S)).toFinset using Finset.induction_on with
-  | empty => simp [h]; sorry
-  | insert a s _ _ => sorry
-
-
-  -- First, rewrite the LHS domain to use Finset.biUnion instead of Set.biUnion
-  -- have h_domain : (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}) =
-  --   (⋃₀ (κ.f '' S)).toFinset.biUnion (fun y => {v | y ∈ κ.f v}.toFinset) := by
-  --     simp
-
-  -- -- Substitute this back into your main goal
-  -- simp_rw [h_domain]
-
-  -- -- Step 2: Set up induction over the finite set Y
-  -- -- Let Y = (⋃₀ (κ.f '' S)).toFinset
-  -- generalize hY : (⋃₀ (κ.f '' S)).toFinset = Y
-  -- induction Y using Finset.induction_on
-  -- · -- Base case: Y is Empty Finset.
-  --   -- Both sides collapse to 0 using `simp`
-  --   simp
-  -- · -- Inductive Step: Y is inserted with `y`
-  --   -- This is where you can split off the new element
-  --   simp only [Finset.biUnion_insert, Finset.sum_insert hy]
-  --   -- Now use Finset.sum_le_sum_of_subset to handle the new overlapping pieces!
-
-  --   sorry
+theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
+  : ∑ x ∈ (κ.closure S), f x
+  ≤ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
+  classical
+  simp_rw [show κ.closure S =
+    (⋃ y ∈ S, κ.f y).toFinset.biUnion (fun t => {v | t ∈ κ.f v}.toFinset) by simp [closure]]
+  simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+    Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
 
 ----------------------------------------------------------------------------------------------------
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Covering.id G, by unfold Covering.id; aesop⟩
 
 @[simp] theorem Tiling.closure_idemp : τ.1.closure (τ.1.closure S) = τ.1.closure S := by
-  ext x; constructor <;> simp only [Covering.closure, Set.sUnion_image, Set.mem_iUnion, exists_prop,
-    Set.iUnion_exists, Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp, τ.2]
+  ext x; constructor <;> simp only [τ.2, Covering.closure, Set.mem_iUnion, exists_prop,
+    Set.iUnion_exists, Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp]
   · intro a b c d e f g h i; refine ⟨a, b, c, d, ?_⟩; rw [i, ←h]; exact f
   · intro a b c d e; exact ⟨a, b, c, d, x, e, c, e, e⟩
 
