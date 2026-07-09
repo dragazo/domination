@@ -13,13 +13,11 @@ structure Policy (V : Type*) where
 structure Covering (G : SimpleGraph V) where
   t : Type*
   f : V → Set t
-  n : Nat
   d : Nat
-  n₀ : n ≠ 0 := by norm_num
   d₀ : d ≠ 0 := by norm_num
   h₁ : ∀ v, (f v).Nonempty := by aesop
   h₂ : ∀ v, (f v).Finite := by aesop
-  h₃ : ∀ t, {v | t ∈ f v}.ncard = n := by aesop
+  h₃ : ∀ t, {v | t ∈ f v}.Finite := by aesop
   h₄ : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
 def Tiling (G : SimpleGraph V) := { κ : Covering G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
@@ -100,9 +98,12 @@ theorem Policy.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, π.f x) ≤ π.m * S.n
 ----------------------------------------------------------------------------------------------------
 
 noncomputable instance Covering.fintype {t : κ.t} : Fintype {v | t ∈ κ.f v} := by
-  apply Set.Finite.fintype; apply Set.finite_of_ncard_ne_zero; rw [κ.h₃ t]; exact κ.n₀
+  apply Set.Finite.fintype; apply κ.h₃
 
-def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, n := 1, d := 1 }
+def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, d := 1 }
+
+-- def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
+--   ⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}
 
 def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
   ⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}
@@ -142,10 +143,55 @@ noncomputable instance Covering.tiles_fintype [Fintype S] : Fintype (⋃₀ (κ.
   · apply Set.toFinite
   · intro t ht; simp only [Set.mem_image] at ht; obtain ⟨y, h₁, h₂⟩ := ht; rw [←h₂]; apply κ.h₂
 
-noncomputable instance Covering.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
-  apply Set.Finite.fintype; apply Set.Finite.biUnion
-  · apply Set.toFinite
-  · intros; apply Set.finite_of_ncard_ne_zero; rw [κ.h₃]; exact κ.n₀
+noncomputable instance Covering.closure_fintype' [Fintype S]
+  : Fintype (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}) := by
+  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.h₃ _)
+
+noncomputable instance Covering.closure_fintype [Fintype S]
+  : Fintype (κ.closure S) := κ.closure_fintype'
+
+#check Finset.sum_le_sum_of_subset
+#check Finset.sum_le_sum
+#check Finset.sum_biUnion
+#check Finset.sum_sigma
+#check Finset.sum_sigma'
+#check Finset.sum_biUnion
+
+theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} : ∑ x ∈ (κ.closure S), f x
+  ≤ ∑ y ∈ (⋃₀ (κ.f '' S)).toFinset, ∑ x ∈ {v | y ∈ κ.f v}.toFinset, f x := by
+  -- classical
+  unfold closure;
+
+  -- have t : (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}).toFinset = (⋃ t ∈ (⋃₀ (κ.f '' S)).toFinset, {x | t ∈ κ.f x}).toFinset := by
+  --   sorry
+  conv_lhs => arg 1; rw [t]
+
+  induction h : (⋃₀ (κ.f '' S)).toFinset using Finset.induction_on with
+  | empty => simp [h]; sorry
+  | insert a s _ _ => sorry
+
+
+  -- First, rewrite the LHS domain to use Finset.biUnion instead of Set.biUnion
+  -- have h_domain : (⋃ t ∈ ⋃₀ (κ.f '' S), {x | t ∈ κ.f x}) =
+  --   (⋃₀ (κ.f '' S)).toFinset.biUnion (fun y => {v | y ∈ κ.f v}.toFinset) := by
+  --     simp
+
+  -- -- Substitute this back into your main goal
+  -- simp_rw [h_domain]
+
+  -- -- Step 2: Set up induction over the finite set Y
+  -- -- Let Y = (⋃₀ (κ.f '' S)).toFinset
+  -- generalize hY : (⋃₀ (κ.f '' S)).toFinset = Y
+  -- induction Y using Finset.induction_on
+  -- · -- Base case: Y is Empty Finset.
+  --   -- Both sides collapse to 0 using `simp`
+  --   simp
+  -- · -- Inductive Step: Y is inserted with `y`
+  --   -- This is where you can split off the new element
+  --   simp only [Finset.biUnion_insert, Finset.sum_insert hy]
+  --   -- Now use Finset.sum_le_sum_of_subset to handle the new overlapping pieces!
+
+  --   sorry
 
 ----------------------------------------------------------------------------------------------------
 
