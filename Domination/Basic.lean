@@ -148,6 +148,8 @@ theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ 
   simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
     Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
 
+
+
 ----------------------------------------------------------------------------------------------------
 
 def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Covering.id G, by unfold Covering.id; aesop⟩
@@ -498,15 +500,18 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
+theorem Covering.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
+  : ∑ x ∈ κ.closure S, f x
+  = ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
+  apply le_antisymm (κ.closure_sum_le_tile_sum hf)
+
+  sorry
+
 #check mul_le_of_mul_le_of_nonneg_left
 theorem cfudensity_at_cover_ge [G.LocallyFinite]
-  (h₀ : 0 ≤ d)
-  (h₁ : ∀ t, {v | t ∈ κ.f v}.ncard ≤ n)
-  (h₂ : ∀ t, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x ≥ d * n)
+  (h : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x) / {v | t ∈ κ.f v}.ncard ≥ d)
   (st : slow_covering_at κ v := by assumption)
   : cfudensity_at κ π v ≥ d := by
-  unfold cfudensity_at
-
   apply Filter.le_limsup_of_frequently_le _
      (by exists π.m + 1; rw [Filter.eventually_map]; exact cball_fdiv_eventually_le)
   apply Filter.Frequently.of_forall; intro r; rw [le_div_iff₀ (by ball!)]
