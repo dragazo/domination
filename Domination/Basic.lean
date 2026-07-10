@@ -511,37 +511,23 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
-theorem Covering.closure_sum_eq_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
-  : ∑ x ∈ κ.closure S, f x
-  = ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
-  apply le_antisymm (κ.closure_sum_le_tile_sum hf)
-
-  sorry
-
-#check mul_le_of_mul_le_of_nonneg_left
 theorem cfudensity_at_cover_ge [G.LocallyFinite]
-  (h : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x) / {v | t ∈ κ.f v}.ncard ≥ d)
+  (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
+  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x) / {v | t ∈ κ.f v}.ncard ≥ d)
   (st : slow_covering_at κ v := by assumption)
-  : cfudensity_at κ π v ≥ d := by
+  : cfudensity_at κ π v ≥ d / k := by
   apply Filter.le_limsup_of_frequently_le _
-     (by exists π.m + 1; rw [Filter.eventually_map]; exact cball_fdiv_eventually_le)
-  apply Filter.Frequently.of_forall; intro r; rw [le_div_iff₀ (by ball!)]
-
-
+     (by exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le _)
+  apply Filter.Frequently.of_forall; intro r
+  cases Decidable.em (k = 0) with | inl h => ball! [cfudensity_at, h] | inr =>
+  cases Decidable.em (d < 0) with
+  | inl h => apply le_trans (b := 0) _ (by ball!); apply div_nonpos_of_nonpos_of_nonneg <;> linarith
+  | inr =>
+  rw [div_le_div_iff₀ (by norm_cast; omega) (by ball!), mul_comm _ (k : Real)]
+  apply le_trans _ (κ.closure_sum_ge_tile_sum π.f₀ h₁)
   rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
-
-
-
-  apply le_trans (κ.closure_sum_le_tile_sum (by simp [h₀]))
-  sorry
-
-
-  -- unfold Covering.cball;
-
-
-  rw [k.closure_sum_le_tile_sum, κ.closure_sum_le_tile_sum]
+  apply le_trans (κ.closure_sum_le_tile_sum (by simp_all))
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  apply le_trans (b := d * n)
-  · apply mul_le_mul_of_nonneg_left (by simp [h₁])
-  · sorry
+  rw [←le_div_iff₀ (by simp only [Nat.cast_pos]; rw [Set.ncard_pos]; apply κ.t_nonempty)]
+  apply h₂
