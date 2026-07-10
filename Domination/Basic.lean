@@ -144,11 +144,22 @@ theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ 
   ≤ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
-    (⋃ y ∈ S, κ.f y).toFinset.biUnion (fun t => {v | t ∈ κ.f v}.toFinset) by simp [closure]]
+    (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
   simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
     Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
 
-
+theorem Covering.closure_sum_ge_tile_sum [Fintype S] {f : V → Real}
+  (hf : ∀ v, 0 ≤ f v) (h : ∀ x, (κ.f x).ncard ≤ k)
+  : k * ∑ x ∈ κ.closure S, f x
+  ≥ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
+  classical
+  simp_rw [show κ.closure S =
+    (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
+  simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
+    Set.biUnion_and', Finset.toFinset_coe]; apply sum_biUnion_ge hf
+  intro v; simp only [Set.mem_toFinset, Set.mem_setOf_eq]
+  apply le_trans (b := (κ.f v).ncard) _ (h v)
+  rw [←Set.ncard_coe_finset]; apply Set.ncard_le_ncard (by intro _ _; simp_all) (κ.f_finite v)
 
 ----------------------------------------------------------------------------------------------------
 

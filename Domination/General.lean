@@ -31,8 +31,8 @@ theorem sum_biUnion_le [DecidableEq β] {s : Finset α} {g : α → Finset β} {
     rw [←Finset.sum_union_inter]; apply le_add_of_nonneg_right; apply Finset.sum_nonneg; aesop
 
 theorem sum_biUnion_ge [DecidableEq β] {s : Finset α} {g : α → Finset β} {f : β → Real}
-  (hg : ∀ t, {x ∈ s | t ∈ g x}.card ≤ k)
-  (hf : ∀ x, 0 ≤ f x) : ∑ t ∈ s, ∑ x ∈ g t, f x ≤ (k : Real) * ∑ x ∈ s.biUnion g, f x := by
+  (hf : ∀ x, 0 ≤ f x) (hg : ∀ t, {x ∈ s | t ∈ g x}.card ≤ k)
+  : ∑ t ∈ s, ∑ x ∈ g t, f x ≤ k * ∑ x ∈ s.biUnion g, f x := by
   classical
   rw [Finset.mul_sum, Finset.sum_sigma']
   suffices h : ∑ x ∈ s.sigma g, f x.snd = ∑ i ∈ s.biUnion g, {x ∈ s | i ∈ g x}.card * f i by
@@ -40,6 +40,6 @@ theorem sum_biUnion_ge [DecidableEq β] {s : Finset α} {g : α → Finset β} {
   rw [←Finset.sum_fiberwise_of_maps_to' (show ∀ x ∈ s.sigma g, x.snd ∈ s.biUnion g by
     intro ⟨a, b⟩ h; simp only [Finset.mem_sigma, Finset.mem_biUnion] at *; exists a)]
   apply Finset.sum_congr rfl; intro v hv; rw [Finset.sum_const, nsmul_eq_mul]
-  rw [show {i ∈ s.sigma g | i.snd = v} = {t ∈ s | v ∈ g t}.image (fun t => ⟨t, v⟩) by
+  rw [show {i ∈ s.sigma g | i.snd = v} = {x ∈ s | v ∈ g x}.image (⟨·, v⟩) by
     clear hg hv hf f; ext ⟨t, y⟩; aesop]
   rw [Finset.card_image_of_injective _ (fun _ _ h ↦ by simp_all)]
