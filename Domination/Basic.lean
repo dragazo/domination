@@ -148,9 +148,8 @@ theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ 
   simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
     Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
 
-theorem Covering.closure_sum_ge_tile_sum [Fintype S] {f : V → Real}
-  (hf : ∀ v, 0 ≤ f v) (h : ∀ x, (κ.f x).ncard ≤ k)
-  : k * ∑ x ∈ κ.closure S, f x
+theorem Covering.closure_sum_ge_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
+  (h : ∀ x, (κ.f x).ncard ≤ k) : k * ∑ x ∈ κ.closure S, f x
   ≥ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
@@ -511,6 +510,24 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
+theorem cfudensity_at_cover_le [G.LocallyFinite]
+  (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
+  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x) / {v | t ∈ κ.f v}.ncard ≤ d)
+  : cfudensity_at κ π v ≤ d * k := by
+  apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
+  apply Filter.Eventually.of_forall; intro r
+  cases Decidable.em (d < 0) with
+  | inl h => have g := le_trans (a := 0) (by ball!) (h₂ (κ.f_nonempty v).some); linarith
+  | inr =>
+  rw [div_le_iff₀ (by ball!), mul_comm d, mul_assoc]
+  apply le_trans (κ.closure_sum_le_tile_sum π.f₀)
+  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
+  apply le_trans _ (κ.closure_sum_ge_tile_sum (by simp_all) h₁)
+  apply Finset.sum_le_sum; intro t ht
+  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
+  rw [←div_le_iff₀ (by norm_cast; rw [Set.ncard_pos]; apply κ.t_nonempty)]
+  apply h₂
+
 theorem cfudensity_at_cover_ge [G.LocallyFinite]
   (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
   (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, π.f x) / {v | t ∈ κ.f v}.ncard ≥ d)
@@ -519,7 +536,7 @@ theorem cfudensity_at_cover_ge [G.LocallyFinite]
   apply Filter.le_limsup_of_frequently_le _
      (by exists π.m + 1; rw [Filter.eventually_map]; apply cball_fdiv_eventually_le _)
   apply Filter.Frequently.of_forall; intro r
-  cases Decidable.em (k = 0) with | inl h => ball! [cfudensity_at, h] | inr =>
+  cases Decidable.em (k = 0) with | inl h => ball! [h] | inr =>
   cases Decidable.em (d < 0) with
   | inl h => apply le_trans (b := 0) _ (by ball!); apply div_nonpos_of_nonpos_of_nonneg <;> linarith
   | inr =>
@@ -529,5 +546,5 @@ theorem cfudensity_at_cover_ge [G.LocallyFinite]
   apply le_trans (κ.closure_sum_le_tile_sum (by simp_all))
   apply Finset.sum_le_sum; intro t ht
   rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [←le_div_iff₀ (by simp only [Nat.cast_pos]; rw [Set.ncard_pos]; apply κ.t_nonempty)]
+  rw [←le_div_iff₀ (by norm_cast; rw [Set.ncard_pos]; apply κ.t_nonempty)]
   apply h₂
