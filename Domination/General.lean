@@ -28,7 +28,7 @@ theorem sum_biUnion_le [DecidableEq β] {s : Finset α} {g : α → Finset β} {
   | insert t s ht ih =>
     simp only [Finset.biUnion_insert, not_false_eq_true, Finset.sum_insert, ht]
     apply le_trans _ (add_le_add_right ih _)
-    rw [←Finset.sum_union_inter]; apply le_add_of_nonneg_right; apply Finset.sum_nonneg; aesop
+    rw [←Finset.sum_union_inter]; apply le_add_of_nonneg_right; apply Finset.sum_nonneg; simp_all
 
 theorem sum_biUnion_ge [DecidableEq β] {s : Finset α} {g : α → Finset β} {f : β → Real}
   (hf : ∀ x, 0 ≤ f x) (hg : ∀ t, {x ∈ s | t ∈ g x}.card ≤ k)
