@@ -10,9 +10,8 @@ structure Policy (V : Type*) where
   f₀ : ∀ r, 0 ≤ f r := by aesop
   fₘ : ∀ r, f r ≤ m := by aesop
 
-structure Covering (G : SimpleGraph V) where
-  t : Type*
-  f : V → Set t
+structure Cover (G : SimpleGraph V) (T : Type*) where
+  f : V → Set T
   d : Nat
   f_nonempty : ∀ v, (f v).Nonempty := by aesop
   f_finite   : ∀ v, (f v).Finite := by aesop
@@ -20,15 +19,19 @@ structure Covering (G : SimpleGraph V) where
   t_finite   : ∀ t, {v | t ∈ f v}.Finite := by aesop
   diameter   : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
-def Tiling (G : SimpleGraph V) := { κ : Covering G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
+def AutoCover (G : SimpleGraph V) := { κ : Cover G V // ∀ u v, u ∈ κ.f v → G.edist u v ≤ κ.d }
 
-variable {V : Type*} {G : SimpleGraph V} {π : Policy V} {S : Set V}
-variable {κ κ₁ κ₂ : Covering G} {τ τ₁ τ₂ : Tiling G}
+def Tiling (G : SimpleGraph V) (T : Type*) := { κ : Cover G T // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
+
+variable {V T : Type*} {G : SimpleGraph V} {π : Policy V} {S : Set V}
+variable {κ κ₁ κ₂ : Cover G T} {α α₁ α₂ : AutoCover G} {τ τ₁ τ₂ : Tiling G T}
 
 def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
 ----------------------------------------------------------------------------------------------------
+
+@[simp] theorem ball₀ : ball G 0 v = {v} := by simp [ball]
 
 @[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
   ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
@@ -97,75 +100,76 @@ theorem Policy.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, π.f x) ≤ π.m * S.n
 
 ----------------------------------------------------------------------------------------------------
 
-noncomputable instance Covering.fintype {t : κ.t} : Fintype {v | t ∈ κ.f v} := by
+noncomputable instance Cover.t_fintype {t : T} : Fintype {v | t ∈ κ.f v} := by
   apply Set.Finite.fintype; apply κ.t_finite
 
-def Covering.id (G : SimpleGraph V) : Covering G := { t := V, f := fun v ↦ {v}, d := 0 }
+noncomputable instance Cover.f_fintype {v : V} : Fintype (κ.f v) := by
+  apply Set.Finite.fintype; apply κ.f_finite
 
-def Covering.closure (κ : Covering G) (S : Set V) : Set V :=
+def Cover.id (G : SimpleGraph V) : Cover G V := { f := fun v ↦ {v}, d := 0 }
+
+def Cover.closure (κ : Cover G T) (S : Set V) : Set V :=
   ⋃ y ∈ S, ⋃ t ∈ κ.f y, {x | t ∈ κ.f x}
 
-@[simp] theorem Covering.id_closure : (Covering.id G).closure S = S := by
+@[simp] theorem Cover.id_closure : (Cover.id G).closure S = S := by
   ext x; constructor <;> simp only [closure, id, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]
   · intro ⟨a, b, c, d, e⟩; rw [←e, d]; exact b
   · intro h; exact ⟨x, h, x, rfl, rfl⟩
 
-theorem Covering.subset_closure : S ⊆ κ.closure S := by
+theorem Cover.subset_closure : S ⊆ κ.closure S := by
   intro x h; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]
   refine ⟨x, h, ?_⟩; simp only [and_self]; apply κ.f_nonempty
 
-theorem Covering.closure_subset : κ.closure S ⊆ ⋃ x ∈ S, ball G κ.d x := by
+theorem Cover.closure_subset : κ.closure S ⊆ ⋃ x ∈ S, ball G κ.d x := by
   intro x; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, ball, and_imp,
     forall_exists_index]; intro a b c d e; refine ⟨a, b, ?_⟩; apply κ.diameter; exists c
 
-theorem Covering.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closure S₂ := by
+theorem Cover.closure_mono (h : S₁ ⊆ S₂) : κ.closure S₁ ⊆ κ.closure S₂ := by
   intro x; simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop, forall_exists_index,
     and_imp]; intro a b c d e; refine ⟨a, h b, c, d, e⟩
 
-theorem Covering.closure_mem (h : x ∈ S) : x ∈ κ.closure S := by
+theorem Cover.closure_mem (h : x ∈ S) : x ∈ κ.closure S := by
   simp only [closure, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]; refine ⟨x, h, ?_⟩
   simp only [and_self]; apply κ.f_nonempty
 
-theorem Covering.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
+theorem Cover.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
   apply Set.Nonempty.mono (s := S) κ.subset_closure h
 
-theorem Covering.biUnion_closure_eq {f : V → Set V}
-  : ⋃ x ∈ S, κ.closure (f x) = κ.closure (⋃ x ∈ S, f x) := by simp [Covering.closure]
+theorem Cover.biUnion_closure_eq {f : V → Set V}
+  : ⋃ x ∈ S, κ.closure (f x) = κ.closure (⋃ x ∈ S, f x) := by simp [Cover.closure]
 
-noncomputable instance Covering.tiles_fintype [Fintype S] : Fintype (⋃ y ∈ S, κ.f y) := by
+noncomputable instance Cover.tiles_fintype [Fintype S] : Fintype (⋃ y ∈ S, κ.f y) := by
   apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.f_finite _)
 
-noncomputable instance Covering.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
+noncomputable instance Cover.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
   apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _); intro _ _
   apply Set.Finite.biUnion (κ.f_finite _) (fun _ _ ↦ κ.t_finite _)
 
-theorem Covering.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
+theorem Cover.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
   : ∑ x ∈ κ.closure S, f x
   ≤ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
     (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
-  simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
+  rw [Finset.toFinset_coe]; exact sum_biUnion_le hf
 
-theorem Covering.closure_sum_ge_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
+theorem Cover.closure_sum_ge_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
   (h : ∀ x, (κ.f x).ncard ≤ k) : k * ∑ x ∈ κ.closure S, f x
   ≥ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
     (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
-  simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Finset.toFinset_coe]; apply sum_biUnion_ge hf
+  rw [Finset.toFinset_coe]; apply sum_biUnion_ge hf
   intro v; simp only [Set.mem_toFinset, Set.mem_setOf_eq]
   apply le_trans (b := (κ.f v).ncard) _ (h v)
   rw [←Set.ncard_coe_finset]; apply Set.ncard_le_ncard (by intro _ _; simp_all) (κ.f_finite v)
 
 ----------------------------------------------------------------------------------------------------
 
-def Covering.cball (κ : Covering G) (r : Nat) (v : V) := κ.closure (ball G r v)
+def Cover.cball (κ : Cover G T) (r : Nat) (v : V) := κ.closure (ball G r v)
 
 theorem cball_eq_union_cball : κ.cball (r + 1) v = ⋃ u ∈ ball G 1 v, κ.cball r u := by
-  unfold Covering.cball; rw [κ.biUnion_closure_eq, ball_eq_union_ball]
+  unfold Cover.cball; rw [κ.biUnion_closure_eq, ball_eq_union_ball]
 
 theorem cball_nonempty : (κ.cball r v).Nonempty := κ.closure_nonempty ball_nonempty
 
@@ -201,7 +205,7 @@ def slow_growth_at (G : SimpleGraph V) (v : V) (e₁ := 1) (e₂ := 0) := Filter
   (fun r ↦ ((ball G (r + e₁) v).ncard : Real) / ((ball G (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
-def slow_covering_at (κ : Covering G) (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
+def slow_covering_at (κ : Cover G T) (v : V) (e₁ := 1) (e₂ := 0) := Filter.Tendsto
   (fun r ↦ ((κ.cball (r + e₁) v).ncard : Real) / ((κ.cball (r + e₂) v).ncard : Real))
   Filter.atTop (nhds 1)
 
@@ -244,9 +248,9 @@ theorem slow_growth_at_ext [G.LocallyFinite]
   : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
   unfold slow_growth_at
   conv_lhs =>
-    arg 1; ext r; repeat rw [←Covering.id_closure (G := G) (S := ball G _ v), ←Covering.cball]
+    arg 1; ext r; repeat rw [←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
   conv_rhs =>
-    arg 1; ext r; repeat rw [←Covering.id_closure (G := G) (S := ball G _ v), ←Covering.cball]
+    arg 1; ext r; repeat rw [←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
   rw [←slow_covering_at, ←slow_covering_at]; exact slow_covering_at_ext _ _
 
 theorem slow_covering_at_iff [G.LocallyFinite]
@@ -296,7 +300,7 @@ theorem slow_covering_at_reach [G.LocallyFinite]
 theorem slow_growth_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
   : slow_growth_at G u := by
-  rw [←slow_covering_at_iff (κ := Covering.id G)] at ⊢ sg; exact slow_covering_at_reach r
+  rw [←slow_covering_at_iff (κ := Cover.id G)] at ⊢ sg; exact slow_covering_at_reach r
 
 -- note: e₁ < e₂ is not provable in general by counterexample: tree with #children = depth
 -- todo: add ext theorem and see if this can be refactored to use it like the others
@@ -340,7 +344,7 @@ noncomputable def fudensity_at (G : SimpleGraph V) [G.LocallyFinite]
   (π : Policy V) (v : V) (e₁ e₂ := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (ball G (r + e₁) v), π.f x) / ↑(ball G (r + e₂) v).ncard) Filter.atTop
 
-noncomputable def cfudensity_at (κ : Covering G) [G.LocallyFinite]
+noncomputable def cfudensity_at (κ : Cover G T) [G.LocallyFinite]
   (π : Policy V) (v : V) (e₁ e₂ : Nat := 0) := Filter.limsup
   (fun r ↦ (∑ x ∈ (κ.cball (r + e₁) v), π.f x) / ↑(κ.cball (r + e₂) v).ncard) Filter.atTop
 
@@ -388,19 +392,19 @@ theorem cfudensity_at_ext [G.LocallyFinite]
 theorem fudensity_at_ext [G.LocallyFinite]
   (e₃ e₄ : Nat := 0) (sg : slow_growth_at G v := by assumption)
   : fudensity_at G π v e₁ e₂ = fudensity_at G π v e₃ e₄ := by
-  rw [←slow_covering_at_iff (κ := Covering.id G)] at sg; unfold fudensity_at
+  rw [←slow_covering_at_iff (κ := Cover.id G)] at sg; unfold fudensity_at
   have cvt {r}
-    : (ball G r v).toFinset = ((Covering.id G).cball r v).toFinset := by ball! [Covering.cball]
+    : (ball G r v).toFinset = ((Cover.id G).cball r v).toFinset := by ball! [Cover.cball]
   conv_lhs =>
-    arg 1; ext r; rw [cvt, ←Covering.id_closure (G := G) (S := (ball G _ v)), ←Covering.cball]
+    arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := (ball G _ v)), ←Cover.cball]
   conv_rhs =>
-    arg 1; ext r; rw [cvt, ←Covering.id_closure (G := G) (S := (ball G _ v)), ←Covering.cball]
+    arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := (ball G _ v)), ←Cover.cball]
   rw [←cfudensity_at, ←cfudensity_at]; exact cfudensity_at_ext _ _
 
 theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_covering_at κ v := by assumption)
   : cfudensity_at κ π v e₁ e₂ = fudensity_at G π v e₁ e₂ := by
   have sg := (slow_covering_at_iff).mp st
-  have st' := (slow_covering_at_iff (κ := Covering.id G)).mpr sg
+  have st' := (slow_covering_at_iff (κ := Cover.id G)).mpr sg
   apply le_antisymm
   · rw [fudensity_at_ext (e₁ + κ.d) e₂]; apply Filter.limsup_le_limsup
     · apply Filter.Eventually.of_forall; intro r; dsimp; apply div_le_div₀ (by ball!) _ (by ball!) _
@@ -409,9 +413,9 @@ theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_covering_at κ v := by ass
     · apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!
     · exists π.m + 1; rw [Filter.eventually_map]; dsimp
       have cvt {r}
-        : (ball G r v).toFinset = ((Covering.id G).cball r v).toFinset := by ball! [Covering.cball]
+        : (ball G r v).toFinset = ((Cover.id G).cball r v).toFinset := by ball! [Cover.cball]
       conv =>
-        arg 1; ext r; rw [cvt, ←Covering.id_closure (G := G) (S := ball G _ v), ←Covering.cball]
+        arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
       exact cball_fdiv_eventually_le 1 (by norm_num) (by assumption)
   · rw [fudensity_at_ext e₁ (e₂ + κ.d)]; apply Filter.limsup_le_limsup
     · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
@@ -443,8 +447,8 @@ theorem cfudensity_at_reach [G.LocallyFinite]
 theorem fudensity_at_reach [G.LocallyFinite]
   (r : G.Reachable v u := by assumption) (sg : slow_growth_at G v := by assumption)
   : fudensity_at G π v e₁ e₂ = fudensity_at G π u e₁ e₂ := by
-  rw [←slow_covering_at_iff (κ := Covering.id G)] at sg; have sg' := slow_covering_at_reach r sg
-  (repeat rw [←cfudensity_at_eq (κ := Covering.id G)]); rw [cfudensity_at_reach]
+  rw [←slow_covering_at_iff (κ := Cover.id G)] at sg; have sg' := slow_covering_at_reach r sg
+  (repeat rw [←cfudensity_at_eq (κ := Cover.id G)]); rw [cfudensity_at_reach]
 
 ----------------------------------------------------------------------------------------------------
 
@@ -489,13 +493,48 @@ theorem cfudensity_at_cover_ge [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
-def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Covering.id G, by unfold Covering.id; aesop⟩
+noncomputable def AutoCover.dom (α : AutoCover G) (π : Policy V) (v : V)
+  := ∑ x ∈ α.1.f v, π.f x
+
+noncomputable def AutoCover.psh (α : AutoCover G) (π : Policy V) (v u : V)
+  := π.f v / α.dom π u
+
+noncomputable def AutoCover.sh (α : AutoCover G) (π : Policy V) (v : V)
+  := ∑ u ∈ α.1.f v, α.psh π v u
+
+theorem AutoCover.f_subset : α.1.f v ⊆ ball G α.1.d v := by
+  intro x; simp only [ball, Set.mem_setOf_eq]; apply α.2
+
+theorem AutoCover.dom_nonneg : 0 ≤ α.dom π v := by apply Finset.sum_nonneg; simp [π.f₀]
+
+theorem AutoCover.psh_nonneg [G.LocallyFinite] : 0 ≤ α.psh π v u := div_nonneg (π.f₀ v) α.dom_nonneg
+
+theorem AutoCover.psh_le [G.LocallyFinite] (h : v ∈ α.1.f u) : α.psh π v u ≤ 1 := by
+  apply div_le_one_of_le₀ _ α.dom_nonneg; rw [←Finset.sum_singleton π.f v]
+  apply Finset.sum_le_sum_of_subset_of_nonneg (by simp [h]) (by simp [π.f₀])
+
+theorem AutoCover.sum_share_ge [G.LocallyFinite]
+  : ∑ x ∈ ball G r v, π.f x ≤ ∑ x ∈ ball G (r + α.1.d) v, α.sh π x := by
+  classical
+  unfold sh
+  rw [Finset.sum_sigma']
+  #check Finset.sum_fiberwise_of_maps_to
+  -- nth_rw 2 [←Finset.sum_fiberwise_of_maps_to']
+  sorry
+
+theorem AutoCover.sum_share_le [G.LocallyFinite]
+  : ∑ x ∈ ball G r v, α.sh π x ≤ ∑ x ∈ ball G (r + α.1.d) v, π.f x := by
+  sorry
+
+----------------------------------------------------------------------------------------------------
+
+def Tiling.id (G : SimpleGraph V) : Tiling G V := ⟨Cover.id G, by unfold Cover.id; aesop⟩
 
 @[simp] theorem Tiling.f_ncard (v : V) : (τ.1.f v).ncard = 1 := by
   rw [Set.ncard_eq_one]; use (τ.1.f_nonempty v).some; rw [←τ.2]; apply Set.Nonempty.some_mem
 
 @[simp] theorem Tiling.closure_idemp : τ.1.closure (τ.1.closure S) = τ.1.closure S := by
-  ext x; constructor <;> simp only [τ.2, Covering.closure, Set.mem_iUnion, exists_prop,
+  ext x; constructor <;> simp only [τ.2, Cover.closure, Set.mem_iUnion, exists_prop,
     Set.iUnion_exists, Set.biUnion_and', Set.mem_setOf_eq, forall_exists_index, and_imp]
   · intro a b c d e f g h i; refine ⟨a, b, c, d, ?_⟩; rw [i, ←h]; exact f
   · intro a b c d e; exact ⟨a, b, c, d, x, e, c, e, e⟩
@@ -506,7 +545,7 @@ theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real}
   classical
   rw [←Finset.sum_biUnion]
   · apply Finset.sum_congr _ (by simp); ext x; constructor <;> intro h <;> simp only [exists_prop,
-    Covering.closure, τ.2, Set.mem_toFinset, Set.mem_iUnion, Finset.mem_biUnion] at *
+    Cover.closure, τ.2, Set.mem_toFinset, Set.mem_iUnion, Finset.mem_biUnion] at *
     · obtain ⟨a, b, c, d, e⟩ := h; exact ⟨c, ⟨a, b, d⟩, e⟩
     · obtain ⟨a, ⟨b, c, d⟩, e⟩ := h; exact ⟨b, c, a, d, e⟩
   · simp only [Set.coe_toFinset]; intro a b c d e
