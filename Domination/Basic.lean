@@ -3,13 +3,6 @@ import Domination.General
 
 ----------------------------------------------------------------------------------------------------
 
-structure Measure (V : Type*) where
-  f : V → Real
-  m : Real
-  m₀ : 0 ≤ m := by norm_num
-  f₀ : ∀ r, 0 ≤ f r := by aesop
-  fₘ : ∀ r, f r ≤ m := by aesop
-
 structure Cover (G : SimpleGraph V) where
   t : Type*
   f : V → Set t
@@ -20,13 +13,20 @@ structure Cover (G : SimpleGraph V) where
   t_finite   : ∀ t, {v | t ∈ f v}.Finite := by aesop
   diameter   : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
+structure Measure (V : Type*) where
+  f : V → Real
+  m : Real
+  m₀ : 0 ≤ m := by norm_num
+  f₀ : ∀ v, 0 ≤ f v := by aesop
+  fₘ : ∀ v, f v ≤ m := by aesop
+
 structure Scheme (κ : Cover G) where
   f : κ.t → κ.t → Real
   m : Real
   d : Nat
   m₀ : 0 ≤ m := by norm_num
-  f_max : ∀ t₁ t₂, |f t₁ t₂| ≤ m := by aesop
-  f_conserve : ∀ t₁ t₂, f t₁ t₂ + f t₂ t₁ = 0 := by aesop
+  f₀ : ∀ t₁ t₂, 0 ≤ f t₁ t₂ := by aesop
+  fₘ : ∀ t₁ t₂, f t₁ t₂ ≤ m := by aesop
   f_dist : ∀ u v, ∀ t₁ ∈ κ.f u, ∀ t₂ ∈ κ.f v, f t₁ t₂ ≠ 0 → G.edist u v ≤ κ.d + d := by aesop
 
 def Tiling (G : SimpleGraph V) := { κ : Cover G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
@@ -95,12 +95,12 @@ noncomputable instance shell_fintype [G.LocallyFinite] : Fintype (shell G r v) :
 ----------------------------------------------------------------------------------------------------
 
 def Measure.zero : Measure V := {
-  f := fun _ ↦ 0,
+  f _ := 0,
   m := 0,
 }
 
 noncomputable def Measure.set (S : Set V) : Measure V := {
-  f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
+  f v := have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
   m := 1
 }
 
@@ -117,6 +117,15 @@ theorem Measure.eq_zero (h : μ.m = 0) : μ = Measure.zero := by
   unfold zero; cases μ; simp_all only [mk.injEq, and_true]; ext x; apply le_antisymm <;> simp_all
 
 theorem Measure.zero_sum [Fintype S] : ∑ x ∈ S, Measure.zero.f x = 0 := by simp_all [zero]
+
+instance Measure.add : Add (Measure V) where
+  add μ₁ μ₂ := {
+    f := fun v ↦ μ₁.f v + μ₂.f v
+    m := μ₁.m + μ₂.m
+    m₀ := by have := μ₁.m₀; have := μ₂.m₀; linarith
+    f₀ v := by have := μ₁.f₀ v; have := μ₂.f₀ v; linarith
+    fₘ v := by have := μ₁.fₘ v; have := μ₂.fₘ v; linarith
+  }
 
 ----------------------------------------------------------------------------------------------------
 
