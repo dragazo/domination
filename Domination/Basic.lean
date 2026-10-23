@@ -24,19 +24,23 @@ structure Scheme (κ : Cover G) where
   f : κ.t → κ.t → Real
   m : Real
   d : Nat
+  m₀ : 0 ≤ m := by norm_num
   f_max : ∀ t₁ t₂, |f t₁ t₂| ≤ m := by aesop
   f_conserve : ∀ t₁ t₂, f t₁ t₂ + f t₂ t₁ = 0 := by aesop
   f_dist : ∀ u v, G.edist u v > κ.d + d → ∀ t₁ ∈ κ.f u, ∀ t₂ ∈ κ.f v, f t₁ t₂ = 0 := by aesop
 
 def Tiling (G : SimpleGraph V) := { κ : Cover G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
 
-variable {V : Type*} {G : SimpleGraph V} {S : Set V} {μ : Measure V} {σ : Scheme κ}
-variable {κ κ₁ κ₂ : Cover G} {τ τ₁ τ₂ : Tiling G}
+variable {V : Type*} {G : SimpleGraph V} {S : Set V} {μ : Measure V}
+variable {κ κ₁ κ₂ : Cover G} {τ τ₁ τ₂ : Tiling G} {σ : Scheme κ}
 
 def ball (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v ≤ r }
 def shell (G : SimpleGraph V) (r : Nat) (v : V) : Set V := { u | G.edist u v = r }
 
 ----------------------------------------------------------------------------------------------------
+
+@[simp] theorem ball₀ : ball G 0 v = {v} := by
+  simp [ball]
 
 @[simp] theorem ball₁ : ball G 1 v = insert v (G.neighborSet v) := by
   ext x; rw [ball, Set.mem_insert_iff, G.mem_neighborSet, or_comm, G.adj_comm]
@@ -113,6 +117,10 @@ def Cover.id (G : SimpleGraph V) : Cover G := { t := V, f := fun v ↦ {v}, d :=
 def Cover.closure (κ : Cover G) (S : Set V) : Set V :=
   ⋃ y ∈ S, ⋃ t ∈ κ.f y, {x | t ∈ κ.f x}
 
+noncomputable instance Cover.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
+  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _); intro _ _
+  apply Set.Finite.biUnion (κ.f_finite _) (fun _ _ ↦ κ.t_finite _)
+
 @[simp] theorem Cover.id_closure : (Cover.id G).closure S = S := by
   ext x; constructor <;> simp only [closure, id, Set.mem_iUnion, Set.mem_setOf_eq, exists_prop]
   · intro ⟨a, b, c, d, e⟩; rw [←e, d]; exact b
@@ -140,12 +148,18 @@ theorem Cover.closure_nonempty (h : S.Nonempty) : (κ.closure S).Nonempty := by
 theorem Cover.biUnion_closure_eq {f : V → Set V}
   : ⋃ x ∈ S, κ.closure (f x) = κ.closure (⋃ x ∈ S, f x) := by simp [Cover.closure]
 
+def Cover.tiles (κ : Cover G) (S : Set V) : Set κ.t := ⋃ x ∈ S, κ.f x
+
 noncomputable instance Cover.tiles_fintype [Fintype S] : Fintype (⋃ y ∈ S, κ.f y) := by
   apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.f_finite _)
 
-noncomputable instance Cover.closure_fintype [Fintype S] : Fintype (κ.closure S) := by
-  apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _); intro _ _
-  apply Set.Finite.biUnion (κ.f_finite _) (fun _ _ ↦ κ.t_finite _)
+@[simp] theorem Cover.id_tiles : (Cover.id G).tiles S = S := by simp [id, tiles]
+
+theorem Cover.tiles_mono (h : S₁ ⊆ S₂) : κ.tiles S₁ ⊆ κ.tiles S₂ := by
+  apply Set.biUnion_mono h; simp
+
+theorem Cover.tiles_nonempty (h : S.Nonempty) : (κ.tiles S).Nonempty := by
+  simp only [tiles, Set.nonempty_iUnion]; have ⟨x, h⟩ := h; exact ⟨x, h, κ.f_nonempty _⟩
 
 theorem Cover.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
   : ∑ x ∈ κ.closure S, f x
@@ -553,8 +567,7 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 def Scheme.id (κ : Cover G) : Scheme κ := { f := fun _ _ ↦ 0, m := 0, d := 0 }
 
-noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] {σ : Scheme κ}
-  : Fintype {t₂ | σ.f t₁ t₂ ≠ 0} := by
+noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] : Fintype {t₂ | σ.f t₁ t₂ ≠ 0} := by
   apply Set.Finite.fintype; have ⟨x, hx⟩ := κ.t_nonempty t₁
   apply Set.Finite.subset (s := ⋃ y ∈ ball G (κ.d + σ.d) x, κ.f y)
   · apply Set.Finite.biUnion <;> ball! [κ.f_finite]
@@ -562,6 +575,47 @@ noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] {σ : Scheme κ}
     contrapose h; apply σ.f_dist x y _ t₁ hx t₂ hy; contrapose h
     simp only [Set.mem_iUnion, exists_prop]; exact ⟨y, by simp_all [ball, G.edist_comm], hy⟩
 
-theorem Scheme.apply [G.LocallyFinite]
-  : ∀ t, ∑ x ∈ { x | t ∈ κ.f x }.toFinite.toFinset, μ.f x = 0 := by
+#check Cover.closure_sum_le_tile_sum
+set_option pp.proofs true
+
+theorem rgegeg [G.LocallyFinite] :
+  ∑ t ∈ (⋃ x ∈ ball G r v, κ.f x), ∑ s ∈ (⋃ x ∈ ball G r v, κ.f x), σ.f s t
+  ≤ σ.m * (ball G (r + σ.d) v \ ball G r v).ncard := by
+  induction r with
+  | zero =>
+    have hh : (⋃ x ∈ ball G 0 v, κ.f x).toFinset = (κ.f_finite v).toFinset := by ext; ball!
+    conv => lhs; rw [hh]
+    sorry
+  | succ r ih =>
+
+    sorry
+
+theorem rger [G.LocallyFinite] :
+  Filter.Tendsto (fun r ↦ ∑ t ∈ (⋃ x ∈ ball G r v, κ.f x), ∑ᶠ s, σ.f s t) Filter.atTop (nhds 0) := by
+
   sorry
+
+theorem thingy [G.LocallyFinite] :
+  Filter.limsup (fun r ↦ (∑ x ∈ (κ.cball r v).toFinset, μ.f x + ∑ σ.f t₁ t₂) / ↑(κ.cball r v).ncard) Filter.atTop =
+  Filter.limsup (fun r ↦ (∑ x ∈ (κ.cball r v).toFinset, μ.f x) / ↑(κ.cball r v).ncard) Filter.atTop := by
+  sorry
+
+theorem cfudensity_at_cover_le' [G.LocallyFinite]
+  (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
+  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x +
+    ∑ t' ∈ {t' | σ.f t t' ≠ 0}.toFinset, σ.f t t') / {v | t ∈ κ.f v}.ncard ≤ d)
+  : cfudensity_at κ μ v ≤ d * k := by
+  unfold cfudensity_at
+  apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
+  apply Filter.Eventually.of_forall; intro r
+  cases Decidable.em (d < 0) with
+  | inl h => have g := le_trans (a := 0) (by ball!) (h₂ (κ.f_nonempty v).some); linarith
+  | inr =>
+  rw [div_le_iff₀ (by ball!), mul_comm d, mul_assoc]
+  apply le_trans (κ.closure_sum_le_tile_sum μ.f₀)
+  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
+  apply le_trans _ (κ.closure_sum_ge_tile_sum (by simp_all) h₁)
+  apply Finset.sum_le_sum; intro t ht
+  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
+  rw [←div_le_iff₀ (by norm_cast; rw [Set.ncard_pos]; apply κ.t_nonempty)]
+  apply h₂
