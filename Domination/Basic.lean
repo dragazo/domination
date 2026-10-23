@@ -206,9 +206,21 @@ noncomputable instance cball_fintype [G.LocallyFinite] : Fintype (κ.cball r v) 
 
 ----------------------------------------------------------------------------------------------------
 
+def Cover.tball (κ : Cover G) (r : Nat) (v : V) := κ.tiles (ball G r v)
+
+theorem tball_nonempty : (κ.tball r v).Nonempty := κ.tiles_nonempty ball_nonempty
+
+theorem tball_mono (h : r₁ ≤ r₂)
+  : κ.tball r₁ v ⊆ κ.tball r₂ v := κ.tiles_mono (ball_mono h)
+
+noncomputable instance tball_fintype [G.LocallyFinite] : Fintype (κ.tball r v) := κ.tiles_fintype
+
+----------------------------------------------------------------------------------------------------
+
 macro "ball!" "[" h:Lean.Parser.Tactic.simpLemma,* "]" : tactic => `(tactic| simp [
   ball_nonempty, ball_mono,
   cball_nonempty, cball_mono, cball_lower, cball_upper,
+  tball_nonempty, tball_mono,
   ball_shell_disjoint,
   Measure.sum_nonneg, Measure.sum_le_m_ncard,
   Set.toFinite, Set.ncard_le_ncard, Set.ncard_pos, Set.Nonempty.ne_empty,
