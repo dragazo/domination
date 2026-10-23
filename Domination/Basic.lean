@@ -150,7 +150,7 @@ theorem Cover.biUnion_closure_eq {f : V → Set V}
 
 def Cover.tiles (κ : Cover G) (S : Set V) : Set κ.t := ⋃ x ∈ S, κ.f x
 
-noncomputable instance Cover.tiles_fintype [Fintype S] : Fintype (⋃ y ∈ S, κ.f y) := by
+noncomputable instance Cover.tiles_fintype [Fintype S] : Fintype (κ.tiles S) := by
   apply Set.Finite.fintype; apply Set.Finite.biUnion (Set.toFinite _) (fun _ _ ↦ κ.f_finite _)
 
 @[simp] theorem Cover.id_tiles : (Cover.id G).tiles S = S := by simp [id, tiles]
@@ -163,21 +163,21 @@ theorem Cover.tiles_nonempty (h : S.Nonempty) : (κ.tiles S).Nonempty := by
 
 theorem Cover.closure_sum_le_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
   : ∑ x ∈ κ.closure S, f x
-  ≤ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
+  ≤ ∑ t ∈ (κ.tiles S).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
-    (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
+    (κ.tiles S).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [tiles, closure]]
   simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Finset.toFinset_coe]; exact sum_biUnion_le hf
+    Set.biUnion_and', Finset.toFinset_coe, tiles]; exact sum_biUnion_le hf
 
 theorem Cover.closure_sum_ge_tile_sum [Fintype S] {f : V → Real} (hf : ∀ v, 0 ≤ f v)
   (h : ∀ x, (κ.f x).ncard ≤ k) : k * ∑ x ∈ κ.closure S, f x
-  ≥ ∑ t ∈ (⋃ y ∈ S, κ.f y).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
+  ≥ ∑ t ∈ (κ.tiles S).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, f x := by
   classical
   simp_rw [show κ.closure S =
-    (⋃ y ∈ S, κ.f y).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [closure]]
+    (κ.tiles S).toFinset.biUnion ({v | · ∈ κ.f v}.toFinset) by simp [tiles, closure]]
   simp only [Finset.coe_biUnion, Set.coe_toFinset, Set.mem_iUnion, exists_prop, Set.iUnion_exists,
-    Set.biUnion_and', Finset.toFinset_coe]; apply sum_biUnion_ge hf
+    Set.biUnion_and', Finset.toFinset_coe, tiles]; apply sum_biUnion_ge hf
   intro v; simp only [Set.mem_toFinset, Set.mem_setOf_eq]
   apply le_trans (b := (κ.f v).ncard) _ (h v)
   rw [←Set.ncard_coe_finset]; apply Set.ncard_le_ncard (by intro _ _; simp_all) (κ.f_finite v)
@@ -540,9 +540,9 @@ def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Cover.id G, by unfold Cover.i
 
 theorem Tiling.closure_sum_eq_tile_sum [Fintype S] {f : V → Real}
   : ∑ x ∈ (τ.1.closure S), f x
-  = ∑ t ∈ (⋃ y ∈ S, τ.1.f y).toFinset, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, f x := by
+  = ∑ t ∈ (τ.1.tiles S).toFinset, ∑ x ∈ {v | t ∈ τ.1.f v}.toFinset, f x := by
   classical
-  rw [←Finset.sum_biUnion]
+  unfold Cover.tiles; rw [←Finset.sum_biUnion]
   · apply Finset.sum_congr _ (by simp); ext x; constructor <;> intro h <;> simp only [exists_prop,
     Cover.closure, τ.2, Set.mem_toFinset, Set.mem_iUnion, Finset.mem_biUnion] at *
     · obtain ⟨a, b, c, d, e⟩ := h; exact ⟨c, ⟨a, b, d⟩, e⟩
