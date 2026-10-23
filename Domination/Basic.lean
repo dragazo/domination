@@ -5,8 +5,8 @@ import Domination.General
 
 structure Measure (V : Type*) where
   f : V → Real
-  m : Real := 1
-  m₀ : 0 < m := by norm_num
+  m : Real
+  m₀ : 0 ≤ m := by norm_num
   f₀ : ∀ r, 0 ≤ f r := by aesop
   fₘ : ∀ r, f r ≤ m := by aesop
 
@@ -94,8 +94,14 @@ noncomputable instance shell_fintype [G.LocallyFinite] : Fintype (shell G r v) :
 
 ----------------------------------------------------------------------------------------------------
 
+def Measure.zero : Measure V := {
+  f := fun _ ↦ 0,
+  m := 0,
+}
+
 noncomputable def Measure.set (S : Set V) : Measure V := {
   f := fun v ↦ have := Classical.propDecidable (v ∈ S); if v ∈ S then 1 else 0
+  m := 1
 }
 
 @[simp] theorem Measure.sum_eq_inter_ncard (s t : Set V) [Fintype s]
@@ -106,6 +112,11 @@ theorem Measure.sum_nonneg : 0 ≤ ∑ x ∈ s, μ.f x := by simp [Finset.sum_no
 theorem Measure.sum_le_m_ncard [Fintype S] : (∑ x ∈ S, μ.f x) ≤ μ.m * S.ncard := by
   rw [Set.ncard_eq_toFinset_card' _, mul_comm, ←nsmul_eq_mul]
   apply Finset.sum_le_card_nsmul; simp [μ.fₘ]
+
+theorem Measure.eq_zero (h : μ.m = 0) : μ = Measure.zero := by
+  unfold zero; cases μ; simp_all only [mk.injEq, and_true]; ext x; apply le_antisymm <;> simp_all
+
+theorem Measure.zero_sum [Fintype S] : ∑ x ∈ S, Measure.zero.f x = 0 := by simp_all [zero]
 
 ----------------------------------------------------------------------------------------------------
 
@@ -397,11 +408,16 @@ theorem cball_div_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real :
 theorem cball_fdiv_eventually_le [G.LocallyFinite] (ε : Real := 1)
   (hε : 0 < ε := by norm_num) (st : slow_cover_at κ v := by assumption) : ∀ᶠ r in Filter.atTop,
   (∑ x ∈ (κ.cball (r + e₁) v), μ.f x) / (κ.cball (r + e₂) v).ncard ≤ μ.m + ε := by
-  apply Filter.Eventually.mono (cball_div_eventually_le e₁ e₂ (ε / μ.m) (div_pos hε μ.m₀) (κ := κ))
+  cases Decidable.em (μ.m = 0) with
+  | inl hm => simp_rw [μ.eq_zero hm, Measure.zero_sum]; simp only [zero_div, Measure.zero,
+    zero_add, Filter.eventually_atTop, ge_iff_le]; use 0; intro _ _; linarith
+  | inr hm =>
+  have hm' : 0 < μ.m := by apply lt_of_le_of_ne μ.m₀; simpa [ne_comm]
+  apply Filter.Eventually.mono (cball_div_eventually_le e₁ e₂ (ε / μ.m) (div_pos hε hm') (κ := κ))
   intro r q; apply le_trans (b := μ.m * (↑(κ.cball (r + e₁) v).ncard / ↑(κ.cball (r + e₂) v).ncard))
   · rw [mul_div]; apply div_le_div_of_nonneg_right <;> ball!
-  · conv_rhs => rw [←mul_one μ.m, ←mul_div_cancel₀ ε (ne_of_lt μ.m₀).symm, ←mul_add]
-    exact mul_le_mul_of_nonneg_left q (le_of_lt μ.m₀)
+  · conv_rhs => rw [←mul_one μ.m, ←mul_div_cancel₀ ε hm, ←mul_add]
+    exact mul_le_mul_of_nonneg_left q μ.m₀
 
 ----------------------------------------------------------------------------------------------------
 
