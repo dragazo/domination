@@ -212,8 +212,7 @@ noncomputable instance cball_fintype [G.LocallyFinite] : Fintype (κ.cball r v) 
 
 def Cover.tball (κ : Cover G) (r : Nat) (v : V) := κ.tiles (ball G r v)
 
-theorem Cover.cball_eq_union_tball [G.LocallyFinite]
-  : κ.cball r v = ⋃ t ∈ (κ.tball r v), {x | t ∈ κ.f x} := by
+theorem Cover.cball_eq_union_tball : κ.cball r v = ⋃ t ∈ (κ.tball r v), {x | t ∈ κ.f x} := by
   rw [cball, tball, κ.closure_eq_union_tiles]
 
 theorem tball_nonempty : (κ.tball r v).Nonempty := κ.tiles_nonempty ball_nonempty
@@ -608,78 +607,14 @@ noncomputable instance Scheme.nonzero_finite' [G.LocallyFinite] : Fintype {t₂ 
 
 
 
-
-
-noncomputable def tfudensity_at (κ : Cover G) [G.LocallyFinite]
-  (μ : Measure V) (v : V) (e₁ e₂ : Nat := 0) := Filter.limsup
-  (fun r ↦ (∑ t ∈ (κ.tball (r + e₁) v), ∑ x ∈ {x | t ∈ κ.f x}.toFinset, μ.f x)
-    / ↑(κ.tball (r + e₂) v).ncard) Filter.atTop
-
-
-
--- theorem Cover.tiles_le_closure [G.LocallyFinite]
---   : (κ.tiles S).ncard ≤ (κ.closure S).ncard := by
---   unfold tiles; unfold closure;
---   sorry
-
-
-
-
-
--- theorem Cover.tball_div_eq_cball_div [G.LocallyFinite]
---   : ((κ.tball r₁ v).ncard : Real) / ((κ.tball r₂ v).ncard : Real)
---   = ((κ.cball r₁ v).ncard : Real) / ((κ.cball r₂ v).ncard : Real) := by
---   -- repeat rw [κ.cball_eq_union_tball]
---   unfold tball; unfold cball; unfold tiles; unfold closure
-
---   sorry
-
--- theorem tfudensity_at_eq [G.LocallyFinite] (st : slow_cover_at κ v := by assumption)
---   : tfudensity_at κ μ v e₁ e₂ = cfudensity_at κ μ v e₁ e₂ := by
---   rw [tfudensity_at, cfudensity_at]; unfold Cover.tball; unfold Cover.cball
-
---   sorry
-
--- theorem tfudensity_at_ext [G.LocallyFinite]
---   (e₃ e₄ : Nat := 0) (st : slow_cover_at κ v := by assumption)
---   : tfudensity_at κ μ v e₁ e₂ = tfudensity_at κ μ v e₃ e₄ := by
---   rw [tfudensity_at, ←Filter.limsup_nat_add _ e₃]; conv_lhs =>
---     arg 1; ext r; rw [add_assoc, add_assoc]
---     rw [←div_mul_div_cancel₀ (b := ((κ.tball (r + (e₁ + e₄)) v).ncard : Real)) (by ball!), mul_comm]
---   rw [←one_mul (tfudensity_at κ μ v e₃ e₄)]
---   apply limsup_mul_eq (m₁ := 2) (m₂ := μ.m + 1) _ _ (by ball!) (by sorry) _ _
---   · cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl h => ball! [h, slow_cover_at] | inr h =>
---     rw [←slow_cover_at, slow_cover_at_ext]; assumption
---   · simp_rw [add_comm e₃, ←add_assoc]
---     rw [Filter.limsup_nat_add (fun r ↦ (∑ x ∈ (κ.cball (r + e₃) v).toFinset, μ.f x)
---       / (κ.cball (r + e₄) v).ncard) e₁, ←cfudensity_at]
---   · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
---     cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl t => ball! [t] | inr t =>
---     rw [←slow_cover_at, slow_cover_at_ext]; assumption
---   · exact cball_fdiv_eventually_le
-
-#check Cover.closure_sum_le_tile_sum
-set_option pp.proofs true
-
-theorem rgegeg [G.LocallyFinite] :
-  ∑ t ∈ (κ.tball r v), ∑ s ∈ (κ.tball r v), σ.f s t
-  ≤ σ.m * (ball G (r + σ.d) v \ ball G r v).ncard := by
-  sorry
-
-theorem rger [G.LocallyFinite] :
-  Filter.Tendsto (fun r ↦ ∑ t ∈ (⋃ x ∈ ball G r v, κ.f x), ∑ᶠ s, σ.f s t) Filter.atTop (nhds 0) := by
-
-  sorry
-
-theorem thingy [G.LocallyFinite] :
-  Filter.limsup (fun r ↦ (∑ x ∈ (κ.cball r v).toFinset, μ.f x + ∑ σ.f t₁ t₂) / ↑(κ.cball r v).ncard) Filter.atTop =
-  Filter.limsup (fun r ↦ (∑ x ∈ (κ.cball r v).toFinset, μ.f x) / ↑(κ.cball r v).ncard) Filter.atTop := by
-  sorry
+theorem ffewf [G.LocallyFinite]
+  : ∑ᶠ t', σ.f t' t = ∑ t' ∈ {t' | σ.f t' t ≠ 0}.toFinset, σ.f t' t := by
+  apply finsum_eq_sum
 
 theorem cfudensity_at_cover_le' [G.LocallyFinite]
   (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
   (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x +
-    ∑ t' ∈ {t' | σ.f t' t ≠ 0}.toFinset, σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
+    ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   rw [cfudensity_at_ext σ.d]
