@@ -21,7 +21,12 @@ structure Cover (G : SimpleGraph V) where
   diameter   : ∀ u v, (f v ∩ f u).Nonempty → G.edist u v ≤ d := by aesop
 
 structure Scheme (κ : Cover G) where
-  s : SimpleGraph κ.t
+  f : κ.t → κ.t → Real
+  m : Real
+  d : Nat
+  f_max : ∀ t₁ t₂, |f t₁ t₂| ≤ m := by aesop
+  f_conserve : ∀ t₁ t₂, f t₁ t₂ + f t₂ t₁ = 0 := by aesop
+  f_dist : ∀ u v, G.edist u v > κ.d + d → ∀ t₁ ∈ κ.f u, ∀ t₂ ∈ κ.f v, f t₁ t₂ = 0 := by aesop
 
 def Tiling (G : SimpleGraph V) := { κ : Cover G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
 
@@ -493,6 +498,9 @@ theorem cfudensity_at_cover_ge [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
+
+----------------------------------------------------------------------------------------------------
+
 def Tiling.id (G : SimpleGraph V) : Tiling G := ⟨Cover.id G, by unfold Cover.id; aesop⟩
 
 @[simp] theorem Tiling.f_ncard (v : V) : (τ.1.f v).ncard = 1 := by
@@ -537,3 +545,23 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
   apply le_antisymm
   · exact cfudensity_at_tile_le (fun _ ↦ le_of_eq (h _))
   · exact cfudensity_at_tile_ge (fun _ ↦ ge_of_eq (h _))
+
+
+
+
+----------------------------------------------------------------------------------------------------
+
+def Scheme.id (κ : Cover G) : Scheme κ := { f := fun _ _ ↦ 0, m := 0, d := 0 }
+
+noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] {σ : Scheme κ}
+  : Fintype {t₂ | σ.f t₁ t₂ ≠ 0} := by
+  apply Set.Finite.fintype; have ⟨x, hx⟩ := κ.t_nonempty t₁
+  apply Set.Finite.subset (s := ⋃ y ∈ ball G (κ.d + σ.d) x, κ.f y)
+  · apply Set.Finite.biUnion <;> ball! [κ.f_finite]
+  · intro t₂ h; have ⟨y, hy⟩ := κ.t_nonempty t₂; rw [Set.mem_setOf] at h hx hy
+    contrapose h; apply σ.f_dist x y _ t₁ hx t₂ hy; contrapose h
+    simp only [Set.mem_iUnion, exists_prop]; exact ⟨y, by simp_all [ball, G.edist_comm], hy⟩
+
+theorem Scheme.apply [G.LocallyFinite]
+  : ∀ t, ∑ x ∈ { x | t ∈ κ.f x }.toFinite.toFinset, μ.f x = 0 := by
+  sorry
