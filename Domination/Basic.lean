@@ -650,21 +650,15 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   classical
-  have hpos : ∀ r, (0 : Real) < (κ.cball r v).ncard := fun r =>
-    Nat.cast_pos.2 ((Set.ncard_pos (Set.toFinite (κ.cball r v))).2 cball_nonempty)
   -- shifted slow growth, from slow_cover_at_ext
-  have sc : ∀ a b : Nat, Filter.Tendsto
+  have sc a b : Filter.Tendsto
       (fun r : Nat => ((κ.cball (r + a) v).ncard : Real) / (κ.cball (r + b) v).ncard)
       Filter.atTop (nhds 1) := by
-    intro a b
-    by_cases hab : a = b
-    · subst hab
-      exact Filter.Tendsto.congr (fun r => (div_self (hpos _).ne').symm) tendsto_const_nhds
-    · exact (slow_cover_at_ext (e₁ := a) (e₂ := b) 1 0 hab one_ne_zero).mpr st
+   by_cases h : a = b <;> [ball! [h]; rwa [←slow_cover_at, slow_cover_at_ext]]
   -- tiles over a finite set of vertices
   have hfin : ∀ S : Set V, S.Finite → (κ.tiles S).Finite := fun S hS =>
     hS.biUnion fun x _ => κ.f_finite x
-  have tcard : ∀ S : Set V, S.Finite → (κ.tiles S).ncard ≤ k * S.ncard := by
+  have tcard : ∀ S, S.Finite → (κ.tiles S).ncard ≤ k * S.ncard := by
     intro S hS
     have hT := hfin S hS
     rw [Set.ncard_eq_toFinset_card _ hT, Set.ncard_eq_toFinset_card S hS]
@@ -805,7 +799,7 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
       (Nat.cast_le.2 h2 : _ ≤ (_ : Real))) hM
     have alg : ∀ a b n X Y : Real, n ≠ 0 → (X + Y * (a / n - b / n)) * n = X * n + Y * (a - b) := by
       intro a b n X Y hn; field_simp
-    have hn := hpos (r + κ.d)
+    have hn : (0 : Real) < (κ.cball (r + κ.d) v).ncard := by ball!
     rw [div_le_iff₀ hn, alg _ _ _ _ _ hn.ne']
     linarith [hP, h3]
   have he : Filter.Tendsto (fun r : Nat => σ.m * N * k
