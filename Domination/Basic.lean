@@ -25,8 +25,8 @@ structure Scheme (κ : Cover G) where
   m : Real
   d : Nat
   m₀ : 0 ≤ m := by norm_num
-  f₀ : ∀ t₁ t₂, 0 ≤ f t₁ t₂ := by aesop
-  fₘ : ∀ t₁ t₂, f t₁ t₂ ≤ m := by aesop
+  f_max : ∀ t₁ t₂, |f t₁ t₂| ≤ m := by aesop
+  f_conserve : ∀ t₁ t₂, f t₁ t₂ + f t₂ t₁ = 0 := by aesop
   f_dist : ∀ u v, ∀ t₁ ∈ κ.f u, ∀ t₂ ∈ κ.f v, f t₁ t₂ ≠ 0 → G.edist u v ≤ κ.d + d := by aesop
 
 def Tiling (G : SimpleGraph V) := { κ : Cover G // ∀ t v, t ∈ κ.f v ↔ κ.f v = {t} }
@@ -375,8 +375,7 @@ theorem slow_boundary_at_iff [G.LocallyFinite] (h₁₂ : e₂ < e₁ := by omeg
     · conv =>
         arg 1; ext r
         rw [←add_assoc, ball_eq_ball_shell, Set.ncard_union_eq (by ball!), Nat.cast_add, add_div]
-      conv => arg 3; rw [←add_zero 1]
-      apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
+      (conv => arg 3; rw [←add_zero 1]); apply Filter.Tendsto.add _ h; rw [←slow_growth_at]
       cases e₁ with | zero => ball! [slow_growth_at] | succ e₁ =>
       rw [←slow_boundary_at_iff (e₁ := e₁ + 1) (e₂ := 0)]
       have t := tendsto_of_tendsto_of_tendsto_of_le_of_le (α := Real)
@@ -609,7 +608,13 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 ----------------------------------------------------------------------------------------------------
 
-def Scheme.id (κ : Cover G) : Scheme κ := { f := fun _ _ ↦ 0, m := 0, d := 0 }
+def Scheme.id (κ : Cover G) : Scheme κ := { f _ _ := 0, m := 0, d := 0 }
+
+theorem Scheme.sum_pairs_eq_zero : ∑ u ∈ T, ∑ v ∈ T, σ.f u v = 0 := by
+  apply eq_zero_of_neg_eq; nth_rw 1 [Finset.sum_comm]
+  rw [←Finset.sum_neg_distrib]; apply Finset.sum_congr rfl; intro a _
+  rw [←Finset.sum_neg_distrib]; apply Finset.sum_congr rfl; intro b _
+  have := σ.f_conserve a b; linarith
 
 noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] : Fintype {t₁ | σ.f t₁ t₂ ≠ 0} := by
   apply Set.Finite.fintype; have ⟨x, hx⟩ := κ.t_nonempty t₂
@@ -632,33 +637,185 @@ noncomputable instance Scheme.nonzero_finite' [G.LocallyFinite] : Fintype {t₂ 
 
 
 
-theorem ffewf [G.LocallyFinite]
-  : ∑ᶠ t', σ.f t' t = ∑ t' ∈ {t' | σ.f t' t ≠ 0}.toFinset, σ.f t' t := by
-  apply finsum_eq_sum
+
+
+
+
 
 theorem cfudensity_at_cover_le' [G.LocallyFinite]
+  (hN : ∀ t₁, {t₂ | σ.f t₁ t₂ ≠ 0}.ncard ≤ N)
+  (h₀ : 0 ≤ d)
   (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
-  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x +
-    ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
+  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x + ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
-  rw [cfudensity_at_ext σ.d]
-  unfold cfudensity_at
-
-
-
-
-  unfold cfudensity_at
+  classical
+  have hpos : ∀ r, (0 : Real) < (κ.cball r v).ncard := fun r =>
+    Nat.cast_pos.2 ((Set.ncard_pos (Set.toFinite (κ.cball r v))).2 cball_nonempty)
+  -- shifted slow growth, from slow_cover_at_ext
+  have sc : ∀ a b : Nat, Filter.Tendsto
+      (fun r : Nat => ((κ.cball (r + a) v).ncard : Real) / (κ.cball (r + b) v).ncard)
+      Filter.atTop (nhds 1) := by
+    intro a b
+    by_cases hab : a = b
+    · subst hab
+      exact Filter.Tendsto.congr (fun r => (div_self (hpos _).ne').symm) tendsto_const_nhds
+    · exact (slow_cover_at_ext (e₁ := a) (e₂ := b) 1 0 hab one_ne_zero).mpr st
+  -- tiles over a finite set of vertices
+  have hfin : ∀ S : Set V, S.Finite → (κ.tiles S).Finite := fun S hS =>
+    hS.biUnion fun x _ => κ.f_finite x
+  have tcard : ∀ S : Set V, S.Finite → (κ.tiles S).ncard ≤ k * S.ncard := by
+    intro S hS
+    have hT := hfin S hS
+    rw [Set.ncard_eq_toFinset_card _ hT, Set.ncard_eq_toFinset_card S hS]
+    calc hT.toFinset.card
+        ≤ (hS.toFinset.biUnion fun x => (κ.f_finite x).toFinset).card :=
+          Finset.card_le_card (fun t ht => by
+            have h := (Set.Finite.mem_toFinset hT).1 ht
+            simp only [Cover.tiles, Set.mem_iUnion, exists_prop] at h
+            obtain ⟨x, hx, htx⟩ := h
+            exact Finset.mem_biUnion.2
+              ⟨x, (Set.Finite.mem_toFinset hS).2 hx, (Set.Finite.mem_toFinset _).2 htx⟩)
+      _ ≤ ∑ x ∈ hS.toFinset, ((κ.f_finite x).toFinset).card := Finset.card_biUnion_le
+      _ ≤ ∑ x ∈ hS.toFinset, k := Finset.sum_le_sum fun x _ => by
+          rw [← Set.ncard_eq_toFinset_card _ (κ.f_finite x)]; exact h₁ x
+      _ = k * hS.toFinset.card := by rw [Finset.sum_const, smul_eq_mul, mul_comm]
+  -- new tiles gained when growing the ball by κ.d + σ.d
+  have tdiff : ∀ R : Nat, ((κ.tball (R + (κ.d + σ.d)) v).ncard : Real) - (κ.tball R v).ncard
+      ≤ k * (((ball G (R + (κ.d + σ.d)) v).ncard : Real) - (ball G R v).ncard) := by
+    intro R
+    have hsub : κ.tball (R + (κ.d + σ.d)) v
+        ⊆ κ.tball R v ∪ κ.tiles (ball G (R + (κ.d + σ.d)) v \ ball G R v) := by
+      intro t ht
+      obtain ⟨x, hx, htx⟩ := Set.mem_iUnion₂.1 ht
+      by_cases h : x ∈ ball G R v
+      · exact Or.inl (Set.mem_iUnion₂.2 ⟨x, h, htx⟩)
+      · exact Or.inr (Set.mem_iUnion₂.2 ⟨x, ⟨hx, h⟩, htx⟩)
+    have hf1 : (κ.tball R v).Finite := hfin _ (Set.toFinite _)
+    have hf2 : (κ.tiles (ball G (R + (κ.d + σ.d)) v \ ball G R v)).Finite :=
+      hfin _ (Set.toFinite _)
+    have h1 : (κ.tball (R + (κ.d + σ.d)) v).ncard ≤ (κ.tball R v).ncard
+        + (κ.tiles (ball G (R + (κ.d + σ.d)) v \ ball G R v)).ncard :=
+      (Set.ncard_le_ncard hsub (hf1.union hf2)).trans (Set.ncard_union_le _ _)
+    have h2 := tcard (ball G (R + (κ.d + σ.d)) v \ ball G R v) (Set.toFinite _)
+    have h3 := Set.ncard_diff_add_ncard_of_subset
+      (ball_mono (Nat.le_add_right R (κ.d + σ.d)) :
+        ball G R v ⊆ ball G (R + (κ.d + σ.d)) v) (Set.toFinite _)
+    have h5 : ((κ.tball (R + (κ.d + σ.d)) v).ncard : Real) ≤ (κ.tball R v).ncard
+        + k * ((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Real) := by
+      exact_mod_cast h1.trans (Nat.add_le_add_left h2 _)
+    have h6 : (((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Nat) : Real)
+        = (ball G (R + (κ.d + σ.d)) v).ncard - (ball G R v).ncard := by
+      have := congrArg (Nat.cast (R := Real)) h3; push_cast at this; linarith
+    rw [h6] at h5; linarith
+  -- one tile receives at most N * m from any finite set of tiles
+  have col : ∀ (T : Finset κ.t) t', |∑ t ∈ T, σ.f t' t| ≤ N * σ.m := by
+    intro T t'
+    have hsub : ((T.filter (fun t => σ.f t' t ≠ 0) : Finset κ.t) : Set κ.t)
+        ⊆ {t₂ | σ.f t' t₂ ≠ 0} := fun t ht =>
+      (Finset.mem_filter.1 (Finset.mem_coe.1 ht)).2
+    have hc : (T.filter (fun t => σ.f t' t ≠ 0)).card ≤ N := by
+      rw [← Set.ncard_coe_finset]; exact (Set.ncard_le_ncard hsub).trans (hN t')
+    calc |∑ t ∈ T, σ.f t' t|
+        = |∑ t ∈ T.filter (fun t => σ.f t' t ≠ 0), σ.f t' t| := by
+          rw [Finset.sum_filter_ne_zero]
+      _ ≤ ∑ t ∈ T.filter (fun t => σ.f t' t ≠ 0), |σ.f t' t| :=
+          Finset.abs_sum_le_sum_abs _ _
+      _ ≤ (T.filter (fun t => σ.f t' t ≠ 0)).card • σ.m :=
+          Finset.sum_le_card_nsmul _ _ _ (fun t _ => σ.f_max t' t)
+      _ = ((T.filter (fun t => σ.f t' t ≠ 0)).card : Real) * σ.m := nsmul_eq_mul _ _
+      _ ≤ N * σ.m := mul_le_mul_of_nonneg_right (by exact_mod_cast hc) σ.m₀
+  -- conservation: inflow into Tl is controlled by tiles outside Tl
+  have core : ∀ Tl E : Finset κ.t, Tl ⊆ E →
+      (∀ t ∈ Tl, Function.support (fun t' => σ.f t' t) ⊆ ↑E) →
+      -(∑ t ∈ Tl, ∑ᶠ t', σ.f t' t) ≤ ((E.card : Real) - Tl.card) * (N * σ.m) := by
+    intro Tl E hTE hs
+    have e1 : ∑ t ∈ Tl, ∑ᶠ t', σ.f t' t = ∑ t ∈ Tl, ∑ t' ∈ E, σ.f t' t :=
+      Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset _ (hs t ht)
+    have e2 : ∑ t ∈ Tl, ∑ t' ∈ E, σ.f t' t = ∑ t ∈ Tl, ∑ t' ∈ E \ Tl, σ.f t' t := by
+      have h : ∀ t ∈ Tl, ∑ t' ∈ E, σ.f t' t
+          = ∑ t' ∈ E \ Tl, σ.f t' t + ∑ t' ∈ Tl, σ.f t' t :=
+        fun t _ => (Finset.sum_sdiff hTE).symm
+      have h0 : ∑ t ∈ Tl, ∑ t' ∈ Tl, σ.f t' t = 0 := by
+        rw [Finset.sum_comm]; exact Scheme.sum_pairs_eq_zero
+      rw [Finset.sum_congr rfl h, Finset.sum_add_distrib, h0, add_zero]
+    have hcard : (((E \ Tl).card : Nat) : Real) = E.card - Tl.card := by
+      have h' := congrArg (Nat.cast (R := Real)) (Finset.card_sdiff_add_card_eq_card hTE)
+      push_cast at h'; linarith
+    rw [e1, e2, Finset.sum_comm, ← hcard]
+    calc -(∑ t' ∈ E \ Tl, ∑ t ∈ Tl, σ.f t' t)
+        ≤ |∑ t' ∈ E \ Tl, ∑ t ∈ Tl, σ.f t' t| := neg_le_abs _
+      _ ≤ ∑ t' ∈ E \ Tl, |∑ t ∈ Tl, σ.f t' t| := Finset.abs_sum_le_sum_abs _ _
+      _ ≤ ∑ t' ∈ E \ Tl, ((N : Real) * σ.m) := Finset.sum_le_sum fun t' _ => col Tl t'
+      _ = ((E \ Tl).card : Real) * (N * σ.m) := by rw [Finset.sum_const, nsmul_eq_mul]
+  -- the pointwise bound at a fixed radius
+  have P : ∀ R : Nat, ∑ x ∈ κ.cball R v, μ.f x ≤ d * k * ((κ.cball R v).ncard : Real)
+      + σ.m * N * k * (((ball G (R + (κ.d + σ.d)) v).ncard : Real) - (ball G R v).ncard) := by
+    intro R
+    have hA : ∑ x ∈ κ.cball R v, μ.f x
+        ≤ ∑ t ∈ (κ.tball R v).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x :=
+      κ.closure_sum_le_tile_sum (S := ball G R v) μ.f₀
+    have hC : ∑ t ∈ (κ.tball R v).toFinset, (({x | t ∈ κ.f x}.ncard : Nat) : Real) * d
+        ≤ k * (((κ.cball R v).ncard : Real) * d) := by
+      have := κ.closure_sum_ge_tile_sum (S := ball G R v) (f := fun _ => d) (fun _ => h₀) h₁
+      simp only [Finset.sum_const, nsmul_eq_mul, ← Set.ncard_eq_toFinset_card'] at this
+      exact this
+    have hD : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x) + ∑ᶠ t', σ.f t' t
+        ≤ ({v | t ∈ κ.f v}.ncard : Real) * d := fun t => by
+      have hp : (0 : Real) < {v | t ∈ κ.f v}.ncard :=
+        Nat.cast_pos.2 ((Set.ncard_pos (κ.t_finite t)).2 (κ.t_nonempty t))
+      have := (div_le_iff₀ hp).1 (h₂ t)
+      linarith
+    have hsum := Finset.sum_le_sum (s := (κ.tball R v).toFinset) (fun t _ => hD t)
+    rw [Finset.sum_add_distrib] at hsum
+    have hTE : (κ.tball R v).toFinset ⊆ (κ.tball (R + (κ.d + σ.d)) v).toFinset :=
+      Set.toFinset_subset_toFinset.2 (tball_mono (Nat.le_add_right _ _))
+    have hsupp : ∀ t ∈ (κ.tball R v).toFinset, Function.support (fun t' => σ.f t' t)
+        ⊆ ↑(κ.tball (R + (κ.d + σ.d)) v).toFinset := by
+      intro t ht t' ht'; rw [Set.mem_toFinset] at ht
+      obtain ⟨y, hy, hty⟩ := Set.mem_iUnion₂.1 ht
+      obtain ⟨u, hu⟩ := κ.t_nonempty t'
+      have hd := σ.f_dist u y t' hu t hty ht'
+      have hy' : G.edist y v ≤ R := hy
+      rw [Finset.mem_coe, Set.mem_toFinset]
+      refine Set.mem_iUnion₂.2 ⟨u, ?_, hu⟩
+      calc G.edist u v ≤ G.edist u y + G.edist y v := G.edist_triangle
+        _ ≤ ((κ.d : ENat) + σ.d) + R := add_le_add hd hy'
+        _ = ((R + (κ.d + σ.d) : Nat) : ENat) := by push_cast; ring
+    have hcore := core _ _ hTE hsupp
+    rw [← Set.ncard_eq_toFinset_card', ← Set.ncard_eq_toFinset_card'] at hcore
+    have hm : 0 ≤ (N : Real) * σ.m := mul_nonneg (Nat.cast_nonneg _) σ.m₀
+    have h4 := mul_le_mul_of_nonneg_right (tdiff R) hm
+    linarith [hA, hsum, hC, hcore, h4]
+  -- normalise at radius r + κ.d, so the lower shift is just `r`
+  have key : ∀ r : Nat, (∑ x ∈ κ.cball (r + κ.d) v, μ.f x) / ((κ.cball (r + κ.d) v).ncard : Real)
+      ≤ d * k + σ.m * N * k * (((κ.cball (r + (κ.d + (κ.d + σ.d))) v).ncard : Real)
+            / (κ.cball (r + κ.d) v).ncard
+          - ((κ.cball r v).ncard : Real) / (κ.cball (r + κ.d) v).ncard) := by
+    intro r
+    rw [← Nat.add_assoc r κ.d (κ.d + σ.d)]
+    have hP := P (r + κ.d)
+    have h1 : (ball G (r + κ.d + (κ.d + σ.d)) v).ncard
+        ≤ (κ.cball (r + κ.d + (κ.d + σ.d)) v).ncard := Set.ncard_le_ncard cball_lower
+    have h2 : (κ.cball r v).ncard ≤ (ball G (r + κ.d) v).ncard :=
+      Set.ncard_le_ncard cball_upper
+    have hM : 0 ≤ σ.m * N * k :=
+      mul_nonneg (mul_nonneg σ.m₀ (Nat.cast_nonneg _)) (Nat.cast_nonneg _)
+    have h3 := mul_le_mul_of_nonneg_left (sub_le_sub (Nat.cast_le.2 h1 : _ ≤ (_ : Real))
+      (Nat.cast_le.2 h2 : _ ≤ (_ : Real))) hM
+    have alg : ∀ a b n X Y : Real, n ≠ 0 → (X + Y * (a / n - b / n)) * n = X * n + Y * (a - b) := by
+      intro a b n X Y hn; field_simp
+    have hn := hpos (r + κ.d)
+    rw [div_le_iff₀ hn, alg _ _ _ _ _ hn.ne']
+    linarith [hP, h3]
+  have he : Filter.Tendsto (fun r : Nat => σ.m * N * k
+      * (((κ.cball (r + (κ.d + (κ.d + σ.d))) v).ncard : Real) / (κ.cball (r + κ.d) v).ncard
+        - ((κ.cball r v).ncard : Real) / (κ.cball (r + κ.d) v).ncard))
+      Filter.atTop (nhds 0) := by
+    have := ((sc (κ.d + (κ.d + σ.d)) κ.d).sub (sc 0 κ.d)).const_mul (σ.m * N * k)
+    rwa [sub_self, mul_zero] at this
+  refine le_of_forall_pos_le_add fun ε hε => ?_
+  rw [cfudensity_at, ← Filter.limsup_nat_add _ κ.d]
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
-  apply Filter.Eventually.of_forall; intro r
-  cases Decidable.em (d < 0) with
-  | inl h => have g := le_trans (a := 0) (by ball!) (h₂ (κ.f_nonempty v).some); linarith
-  | inr =>
-  rw [div_le_iff₀ (by ball!), mul_comm d, mul_assoc]
-  apply le_trans (κ.closure_sum_le_tile_sum μ.f₀)
-  rw [Set.ncard_eq_toFinset_card', Finset.card_eq_sum_ones, Nat.cast_sum, Finset.mul_sum]
-  apply le_trans _ (κ.closure_sum_ge_tile_sum (by simp_all) h₁)
-  apply Finset.sum_le_sum; intro t ht
-  rw [←Finset.mul_sum, ←Nat.cast_sum, ←Finset.card_eq_sum_ones, ←Set.ncard_eq_toFinset_card']
-  rw [←div_le_iff₀ (by norm_cast; rw [Set.ncard_pos]; apply κ.t_nonempty)]
-  apply h₂
+  filter_upwards [Filter.Tendsto.eventually_le_const hε he] with r hr
+  exact (key r).trans (add_le_add le_rfl hr)
