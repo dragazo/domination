@@ -410,8 +410,7 @@ theorem cball_div_eventually_le [G.LocallyFinite] (e₁ e₂ : Nat) (ε : Real :
   (hε : 0 < ε := by omega) (st : slow_cover_at κ v := by assumption) : ∀ᶠ r in Filter.atTop,
   ((κ.cball (r + e₁) v).ncard : Real) / (κ.cball (r + e₂) v).ncard ≤ 1 + ε := by
   apply Filter.Tendsto.eventually_le_const (v := 1) (by simp [hε])
-  cases Decidable.em (e₁ = e₂) with | inl h => ball! [h] | inr h =>
-  rw [←slow_cover_at, slow_cover_at_ext]; assumption
+  by_cases h : e₁ = e₂ <;> [ball! [h]; rwa [←slow_cover_at, slow_cover_at_ext]]
 
 theorem cball_fdiv_eventually_le [G.LocallyFinite] (ε : Real := 1)
   (hε : 0 < ε := by norm_num) (st : slow_cover_at κ v := by assumption) : ∀ᶠ r in Filter.atTop,
@@ -437,26 +436,21 @@ theorem cfudensity_at_ext [G.LocallyFinite]
     rw [←div_mul_div_cancel₀ (b := ((κ.cball (r + (e₁ + e₄)) v).ncard : Real)) (by ball!), mul_comm]
   rw [←one_mul (cfudensity_at κ μ v e₃ e₄)]
   apply limsup_mul_eq (m₁ := 2) (m₂ := μ.m + 1) _ _ (by ball!) (by ball!) _ _
-  · cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl h => ball! [h, slow_cover_at] | inr h =>
-    rw [←slow_cover_at, slow_cover_at_ext]; assumption
+  · by_cases h : e₁ + e₄ = e₃ + e₂ <;> [ball! [h]; rwa [←slow_cover_at, slow_cover_at_ext]]
   · simp_rw [add_comm e₃, ←add_assoc]
     rw [Filter.limsup_nat_add (fun r ↦ (∑ x ∈ (κ.cball (r + e₃) v).toFinset, μ.f x)
       / (κ.cball (r + e₄) v).ncard) e₁, ←cfudensity_at]
   · apply Filter.Tendsto.eventually_le_const (v := 1) (by simp)
-    cases Decidable.em (e₁ + e₄ = e₃ + e₂) with | inl t => ball! [t] | inr t =>
-    rw [←slow_cover_at, slow_cover_at_ext]; assumption
+    by_cases t : e₁ + e₄ = e₃ + e₂ <;> [ball! [t]; rwa [←slow_cover_at, slow_cover_at_ext]]
   · exact cball_fdiv_eventually_le
 
 theorem fudensity_at_ext [G.LocallyFinite]
   (e₃ e₄ : Nat := 0) (sg : slow_growth_at G v := by assumption)
   : fudensity_at G μ v e₁ e₂ = fudensity_at G μ v e₃ e₄ := by
   rw [←slow_cover_at_iff (κ := Cover.id G)] at sg; unfold fudensity_at
-  have cvt {r}
-    : (ball G r v).toFinset = ((Cover.id G).cball r v).toFinset := by ball! [Cover.cball]
-  conv_lhs =>
-    arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := (ball G _ v)), ←Cover.cball]
-  conv_rhs =>
-    arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := (ball G _ v)), ←Cover.cball]
+  have cvt {r} : (ball G r v).toFinset = ((Cover.id G).cball r v).toFinset := by ball! [Cover.cball]
+  conv_lhs => arg 1; ext r; rw [cvt, ←Cover.id_closure (S := (ball G _ v)), ←Cover.cball]
+  conv_rhs => arg 1; ext r; rw [cvt, ←Cover.id_closure (S := (ball G _ v)), ←Cover.cball]
   rw [←cfudensity_at, ←cfudensity_at]; exact cfudensity_at_ext _ _
 
 theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_cover_at κ v := by assumption)
@@ -472,8 +466,7 @@ theorem cfudensity_at_eq [G.LocallyFinite] (st : slow_cover_at κ v := by assump
     · exists μ.m + 1; rw [Filter.eventually_map]; dsimp
       have cvt {r}
         : (ball G r v).toFinset = ((Cover.id G).cball r v).toFinset := by ball! [Cover.cball]
-      conv =>
-        arg 1; ext r; rw [cvt, ←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
+      conv => arg 1; ext r; rw [cvt, ←Cover.id_closure (S := ball G _ v), ←Cover.cball]
       exact cball_fdiv_eventually_le 1 (by norm_num) (by assumption)
   · rw [fudensity_at_ext e₁ (e₂ + κ.d)]; apply Filter.limsup_le_limsup
     · apply Filter.Eventually.of_forall; intro; apply div_le_div₀ (by ball!) _ (by ball!) _
@@ -793,5 +786,7 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
   refine le_of_forall_pos_le_add fun ε hε => ?_
   rw [cfudensity_at, ←Filter.limsup_nat_add _ κ.d]
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
+  -- apply Filter.Tendsto.eventually_le_const hε he
+  have := Filter.Tendsto.eventually_le_const hε he
   filter_upwards [Filter.Tendsto.eventually_le_const hε he] with r hr
-  exact (key r).trans (add_le_add le_rfl hr)
+  exact le_trans (key r) (add_le_add le_rfl hr)
