@@ -610,49 +610,54 @@ theorem cfudensity_at_tile_eq [G.LocallyFinite]
 
 def Scheme.id (κ : Cover G) : Scheme κ := { f _ _ := 0, m := 0, d := 0 }
 
-theorem Scheme.sum_pairs_eq_zero : ∑ u ∈ T, ∑ v ∈ T, σ.f u v = 0 := by
+theorem Scheme.sum_pairs_eq_zero : ∑ u ∈ T, ∑ v ∈ T, σ.f v u = 0 := by
   apply eq_zero_of_neg_eq; nth_rw 1 [Finset.sum_comm]
   rw [←Finset.sum_neg_distrib]; apply Finset.sum_congr rfl; intro a _
   rw [←Finset.sum_neg_distrib]; apply Finset.sum_congr rfl; intro b _
   have := σ.f_conserve a b; linarith
 
-noncomputable instance Scheme.nonzero_finite [G.LocallyFinite] : Fintype {t₁ | σ.f t₁ t₂ ≠ 0} := by
-  apply Set.Finite.fintype; have ⟨x, hx⟩ := κ.t_nonempty t₂
-  apply Set.Finite.subset (s := ⋃ y ∈ ball G (κ.d + σ.d) x, κ.f y)
-  · apply Set.Finite.biUnion <;> ball! [κ.f_finite]
-  · intro t₁ h; have ⟨y, hy⟩ := κ.t_nonempty t₁; rw [Set.mem_setOf] at h hx hy
-    apply σ.f_dist y x t₁ hy t₂ hx at h
-    simp only [Set.mem_iUnion, exists_prop]; exact ⟨y, by simp_all [ball, G.edist_comm], hy⟩
+theorem Scheme.support_subset₁ {hy : t₂ ∈ κ.f y}
+  : {t₁ | σ.f t₁ t₂ ≠ 0} ⊆ κ.tball (κ.d + σ.d) y := by
+  intro t₁ h; have ⟨x, hx⟩ := κ.t_nonempty t₁
+  simp only [Set.mem_setOf_eq, Cover.tball, Cover.tiles, Set.mem_iUnion, exists_prop] at ⊢ h hx
+  exact ⟨x, by simp [ball, σ.f_dist x y t₁ hx t₂ hy h], hx⟩
 
-noncomputable instance Scheme.nonzero_finite' [G.LocallyFinite] : Fintype {t₂ | σ.f t₁ t₂ ≠ 0} := by
-  apply Set.Finite.fintype; have ⟨x, hx⟩ := κ.t_nonempty t₁
-  apply Set.Finite.subset (s := ⋃ y ∈ ball G (κ.d + σ.d) x, κ.f y)
-  · apply Set.Finite.biUnion <;> ball! [κ.f_finite]
-  · intro t₂ h; have ⟨y, hy⟩ := κ.t_nonempty t₂; rw [Set.mem_setOf] at h hx hy
-    apply σ.f_dist x y t₁ hx t₂ hy at h
-    simp only [Set.mem_iUnion, exists_prop]; exact ⟨y, by simp_all [ball, G.edist_comm], hy⟩
+theorem Scheme.support_subset₂ {hx : t₁ ∈ κ.f x}
+  : {t₂ | σ.f t₁ t₂ ≠ 0} ⊆ κ.tball (κ.d + σ.d) x := by
+  intro t₂ h; have ⟨y, hy⟩ := κ.t_nonempty t₂
+  simp only [Set.mem_setOf_eq, Cover.tball, Cover.tiles, Set.mem_iUnion, exists_prop] at ⊢ h hy
+  exact ⟨y, by simp [ball, G.edist_comm, σ.f_dist x y t₁ hx t₂ hy h], hy⟩
 
+noncomputable instance Scheme.support_fintype₁ [G.LocallyFinite]
+  : Fintype {t₁ | σ.f t₁ t₂ ≠ 0} := by
+  apply Set.Finite.fintype; have ⟨x, _⟩ := κ.t_nonempty t₂
+  apply Set.Finite.subset (s := κ.tball _ x) (Set.toFinite _) σ.support_subset₁; simp_all
 
-
-
-
-
-
-
+noncomputable instance Scheme.support_fintype₂ [G.LocallyFinite]
+  : Fintype {t₂ | σ.f t₁ t₂ ≠ 0} := by
+  apply Set.Finite.fintype; have ⟨x, _⟩ := κ.t_nonempty t₁
+  apply Set.Finite.subset (s := κ.tball _ x) (Set.toFinite _) σ.support_subset₂; simp_all
 
 
+
+
+
+
+
+#check finsum_eq_sum_of_support_subset
+#check finsum_eq_sum_of_support_subset_of_finite
 
 theorem cfudensity_at_cover_le' [G.LocallyFinite]
   (hN : ∀ t₁, {t₂ | σ.f t₁ t₂ ≠ 0}.ncard ≤ N)
   (h₀ : 0 ≤ d)
-  (h₁ : ∀ (x : V), (κ.f x).ncard ≤ k)
+  (h₁ : ∀ x, (κ.f x).ncard ≤ k)
   (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x + ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   classical
   -- shifted slow growth, from slow_cover_at_ext
   have sc a b : Filter.Tendsto
-      (fun r : Nat => ((κ.cball (r + a) v).ncard : Real) / (κ.cball (r + b) v).ncard)
+      (fun r => ((κ.cball (r + a) v).ncard : Real) / (κ.cball (r + b) v).ncard)
       Filter.atTop (nhds 1) := by
    by_cases h : a = b <;> [ball! [h]; rwa [←slow_cover_at, slow_cover_at_ext]]
   -- tiles over a finite set of vertices
@@ -724,28 +729,24 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
       (∀ t ∈ Tl, Function.support (fun t' => σ.f t' t) ⊆ ↑E) →
       -(∑ t ∈ Tl, ∑ᶠ t', σ.f t' t) ≤ ((E.card : Real) - Tl.card) * (N * σ.m) := by
     intro Tl E hTE hs
-    have e1 : ∑ t ∈ Tl, ∑ᶠ t', σ.f t' t = ∑ t ∈ Tl, ∑ t' ∈ E, σ.f t' t :=
-      Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset _ (hs t ht)
     have e2 : ∑ t ∈ Tl, ∑ t' ∈ E, σ.f t' t = ∑ t ∈ Tl, ∑ t' ∈ E \ Tl, σ.f t' t := by
       have h : ∀ t ∈ Tl, ∑ t' ∈ E, σ.f t' t
           = ∑ t' ∈ E \ Tl, σ.f t' t + ∑ t' ∈ Tl, σ.f t' t :=
         fun t _ => (Finset.sum_sdiff hTE).symm
-      have h0 : ∑ t ∈ Tl, ∑ t' ∈ Tl, σ.f t' t = 0 := by
-        rw [Finset.sum_comm]; exact Scheme.sum_pairs_eq_zero
-      rw [Finset.sum_congr rfl h, Finset.sum_add_distrib, h0, add_zero]
+      rw [Finset.sum_congr rfl h, Finset.sum_add_distrib, σ.sum_pairs_eq_zero, add_zero]
     have hcard : (((E \ Tl).card : Nat) : Real) = E.card - Tl.card := by
       have h' := congrArg (Nat.cast (R := Real)) (Finset.card_sdiff_add_card_eq_card hTE)
       push_cast at h'; linarith
-    rw [e1, e2, Finset.sum_comm, ← hcard]
+    rw [Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset _ (hs t ht)]
+    rw [e2, Finset.sum_comm, ← hcard]
     calc -(∑ t' ∈ E \ Tl, ∑ t ∈ Tl, σ.f t' t)
         ≤ |∑ t' ∈ E \ Tl, ∑ t ∈ Tl, σ.f t' t| := neg_le_abs _
       _ ≤ ∑ t' ∈ E \ Tl, |∑ t ∈ Tl, σ.f t' t| := Finset.abs_sum_le_sum_abs _ _
       _ ≤ ∑ t' ∈ E \ Tl, ((N : Real) * σ.m) := Finset.sum_le_sum fun t' _ => col Tl t'
       _ = ((E \ Tl).card : Real) * (N * σ.m) := by rw [Finset.sum_const, nsmul_eq_mul]
   -- the pointwise bound at a fixed radius
-  have P : ∀ R : Nat, ∑ x ∈ κ.cball R v, μ.f x ≤ d * k * ((κ.cball R v).ncard : Real)
+  have P R : ∑ x ∈ κ.cball R v, μ.f x ≤ d * k * ((κ.cball R v).ncard : Real)
       + σ.m * N * k * (((ball G (R + (κ.d + σ.d)) v).ncard : Real) - (ball G R v).ncard) := by
-    intro R
     have hA : ∑ x ∈ κ.cball R v, μ.f x
         ≤ ∑ t ∈ (κ.tball R v).toFinset, ∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x :=
       κ.closure_sum_le_tile_sum (S := ball G R v) μ.f₀
@@ -809,7 +810,7 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
     have := ((sc (κ.d + (κ.d + σ.d)) κ.d).sub (sc 0 κ.d)).const_mul (σ.m * N * k)
     rwa [sub_self, mul_zero] at this
   refine le_of_forall_pos_le_add fun ε hε => ?_
-  rw [cfudensity_at, ← Filter.limsup_nat_add _ κ.d]
+  rw [cfudensity_at, ←Filter.limsup_nat_add _ κ.d]
   apply Filter.limsup_le_of_le (by apply Filter.IsBoundedUnder.isCoboundedUnder_le; exists 0; ball!)
   filter_upwards [Filter.Tendsto.eventually_le_const hε he] with r hr
   exact (key r).trans (add_le_add le_rfl hr)
