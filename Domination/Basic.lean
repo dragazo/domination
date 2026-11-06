@@ -641,17 +641,11 @@ noncomputable instance Scheme.support_fintype₂ [G.LocallyFinite]
 
 
 
-
-
-
-#check finsum_eq_sum_of_support_subset
-#check finsum_eq_sum_of_support_subset_of_finite
-
 theorem cfudensity_at_cover_le' [G.LocallyFinite]
-  (hN : ∀ t₁, {t₂ | σ.f t₁ t₂ ≠ 0}.ncard ≤ N)
   (h₀ : 0 ≤ d)
   (h₁ : ∀ x, (κ.f x).ncard ≤ k)
-  (h₂ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x + ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
+  (h₂ : ∀ t₁, {t₂ | σ.f t₁ t₂ ≠ 0}.ncard ≤ N)
+  (h₃ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x + ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   classical
@@ -663,22 +657,11 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
   -- tiles over a finite set of vertices
   have hfin : ∀ S : Set V, S.Finite → (κ.tiles S).Finite := fun S hS =>
     hS.biUnion fun x _ => κ.f_finite x
-  have tcard : ∀ S, S.Finite → (κ.tiles S).ncard ≤ k * S.ncard := by
-    intro S hS
-    have hT := hfin S hS
-    rw [Set.ncard_eq_toFinset_card _ hT, Set.ncard_eq_toFinset_card S hS]
-    calc hT.toFinset.card
-        ≤ (hS.toFinset.biUnion fun x => (κ.f_finite x).toFinset).card :=
-          Finset.card_le_card (fun t ht => by
-            have h := (Set.Finite.mem_toFinset hT).1 ht
-            simp only [Cover.tiles, Set.mem_iUnion, exists_prop] at h
-            obtain ⟨x, hx, htx⟩ := h
-            exact Finset.mem_biUnion.2
-              ⟨x, (Set.Finite.mem_toFinset hS).2 hx, (Set.Finite.mem_toFinset _).2 htx⟩)
-      _ ≤ ∑ x ∈ hS.toFinset, ((κ.f_finite x).toFinset).card := Finset.card_biUnion_le
-      _ ≤ ∑ x ∈ hS.toFinset, k := Finset.sum_le_sum fun x _ => by
-          rw [← Set.ncard_eq_toFinset_card _ (κ.f_finite x)]; exact h₁ x
-      _ = k * hS.toFinset.card := by rw [Finset.sum_const, smul_eq_mul, mul_comm]
+  have tcard {S : Set V} [Fintype S] : (κ.tiles S).ncard ≤ k * S.ncard := by
+    apply le_trans (Set.Finite.ncard_biUnion_le (Set.toFinite _) _)
+    rw [finsum_cond_eq_sum_of_cond_iff (t := S.toFinset) _ (by simp)]
+    rw [mul_comm, ←smul_eq_mul, Set.ncard_eq_toFinset_card']
+    apply Finset.sum_le_card_nsmul; simp [h₁]
   -- new tiles gained when growing the ball by κ.d + σ.d
   have tdiff : ∀ R : Nat, ((κ.tball (R + (κ.d + σ.d)) v).ncard : Real) - (κ.tball R v).ncard
       ≤ k * (((ball G (R + (κ.d + σ.d)) v).ncard : Real) - (ball G R v).ncard) := by
@@ -696,25 +679,23 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
     have h1 : (κ.tball (R + (κ.d + σ.d)) v).ncard ≤ (κ.tball R v).ncard
         + (κ.tiles (ball G (R + (κ.d + σ.d)) v \ ball G R v)).ncard :=
       (Set.ncard_le_ncard hsub (hf1.union hf2)).trans (Set.ncard_union_le _ _)
-    have h2 := tcard (ball G (R + (κ.d + σ.d)) v \ ball G R v) (Set.toFinite _)
     have h3 := Set.ncard_diff_add_ncard_of_subset
       (ball_mono (Nat.le_add_right R (κ.d + σ.d)) :
         ball G R v ⊆ ball G (R + (κ.d + σ.d)) v) (Set.toFinite _)
     have h5 : ((κ.tball (R + (κ.d + σ.d)) v).ncard : Real) ≤ (κ.tball R v).ncard
         + k * ((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Real) := by
-      exact_mod_cast h1.trans (Nat.add_le_add_left h2 _)
+      exact_mod_cast h1.trans (Nat.add_le_add_left tcard _)
     have h6 : (((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Nat) : Real)
         = (ball G (R + (κ.d + σ.d)) v).ncard - (ball G R v).ncard := by
       have := congrArg (Nat.cast (R := Real)) h3; push_cast at this; linarith
     rw [h6] at h5; linarith
   -- one tile receives at most N * m from any finite set of tiles
-  have col : ∀ (T : Finset κ.t) t', |∑ t ∈ T, σ.f t' t| ≤ N * σ.m := by
-    intro T t'
+  have col T t' : |∑ t ∈ T, σ.f t' t| ≤ N * σ.m := by
     have hsub : ((T.filter (fun t => σ.f t' t ≠ 0) : Finset κ.t) : Set κ.t)
         ⊆ {t₂ | σ.f t' t₂ ≠ 0} := fun t ht =>
       (Finset.mem_filter.1 (Finset.mem_coe.1 ht)).2
     have hc : (T.filter (fun t => σ.f t' t ≠ 0)).card ≤ N := by
-      rw [← Set.ncard_coe_finset]; exact (Set.ncard_le_ncard hsub).trans (hN t')
+      rw [← Set.ncard_coe_finset]; exact (Set.ncard_le_ncard hsub).trans (h₂ t')
     calc |∑ t ∈ T, σ.f t' t|
         = |∑ t ∈ T.filter (fun t => σ.f t' t ≠ 0), σ.f t' t| := by
           rw [Finset.sum_filter_ne_zero]
@@ -759,7 +740,7 @@ theorem cfudensity_at_cover_le' [G.LocallyFinite]
         ≤ ({v | t ∈ κ.f v}.ncard : Real) * d := fun t => by
       have hp : (0 : Real) < {v | t ∈ κ.f v}.ncard :=
         Nat.cast_pos.2 ((Set.ncard_pos (κ.t_finite t)).2 (κ.t_nonempty t))
-      have := (div_le_iff₀ hp).1 (h₂ t)
+      have := (div_le_iff₀ hp).1 (h₃ t)
       linarith
     have hsum := Finset.sum_le_sum (s := (κ.tball R v).toFinset) (fun t _ => hD t)
     rw [Finset.sum_add_distrib] at hsum
