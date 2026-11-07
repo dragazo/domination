@@ -316,11 +316,19 @@ theorem slow_growth_at_ext [G.LocallyFinite]
   (e₃ := 1) (e₄ := 0) (h₁₂ : e₁ ≠ e₂ := by omega) (h₃₄ : e₃ ≠ e₄ := by omega)
   : slow_growth_at G v e₁ e₂ ↔ slow_growth_at G v e₃ e₄ := by
   unfold slow_growth_at
-  conv_lhs =>
-    arg 1; ext r; repeat rw [←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
-  conv_rhs =>
-    arg 1; ext r; repeat rw [←Cover.id_closure (G := G) (S := ball G _ v), ←Cover.cball]
+  conv_lhs => arg 1; ext r; repeat rw [←Cover.id_closure (S := ball G _ v), ←Cover.cball]
+  conv_rhs => arg 1; ext r; repeat rw [←Cover.id_closure (S := ball G _ v), ←Cover.cball]
   rw [←slow_cover_at, ←slow_cover_at]; exact slow_cover_at_ext _ _
+
+theorem slow_cover_at_ext' [G.LocallyFinite]
+  (e₃ e₄ : Nat) (sc : slow_cover_at κ v e₁ e₂ := by assumption) (h₁₂ : e₁ ≠ e₂ := by omega)
+  : slow_cover_at κ v e₃ e₄ := by
+  by_cases h₃₄ : e₃ = e₄ <;> [ball! [h₃₄, slow_cover_at]; rwa [slow_cover_at_ext e₁ e₂]]
+
+theorem slow_growth_at_ext' [G.LocallyFinite]
+  (e₁ e₂ : Nat) (sg : slow_growth_at G v e₃ e₄ := by assumption) (h₃₄ : e₃ ≠ e₄ := by omega)
+  : slow_growth_at G v e₁ e₂ := by
+  by_cases h₁₂ : e₁ = e₂ <;> [ball! [h₁₂, slow_growth_at]; rwa [slow_growth_at_ext e₃ e₄]]
 
 theorem slow_cover_at_iff [G.LocallyFinite]
   : slow_cover_at κ v e₁ e₂ ↔ slow_growth_at G v e₁ e₂ := by
@@ -654,12 +662,6 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   classical
-  -- slow growth of balls, shifted by the scheme radius
-  have sc : slow_growth_at G v (κ.d + σ.d) 0 := by
-    by_cases h : κ.d + σ.d = 0
-    · ball! [h, slow_growth_at]
-    · rw [slow_growth_at_ext]; exact slow_cover_at_iff.mp st
-  -- total inflow into T is controlled by the tiles of E outside T
   have core (T E : Finset κ.t) (hTE : T ⊆ E)
       (hs : ∀ t ∈ T, Function.support (fun t' => σ.f t' t) ⊆ ↑E)
       : -(∑ t ∈ T, ∑ᶠ t', σ.f t' t) ≤ N * σ.m * (E \ T).card := by
@@ -675,7 +677,6 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
     norm_cast; rw [←Set.ncard_coe_finset]
     refine le_trans (Set.ncard_le_ncard (t := {t₂ | σ.f t' t₂ ≠ 0}) ?_ (Set.toFinite _)) (h₂ t')
     exact fun t ht => (Finset.mem_filter.1 (Finset.mem_coe.1 ht)).2
-  -- the bound at a fixed radius
   have P R : ∑ x ∈ κ.cball R v, μ.f x ≤ d * k * (κ.cball R v).ncard
       + N * σ.m * (k * ((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Real)) := by
     unfold Cover.cball
@@ -705,7 +706,6 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
     norm_cast
     simp only [←Set.ncard_coe_finset, Finset.coe_sdiff, Set.coe_toFinset]
     exact le_trans (Set.ncard_le_ncard κ.tiles_diff_subset) (κ.tiles_ncard_le h₁)
-  -- the error term tends to zero
   have he : Filter.Tendsto
     (fun r => d * k + (N * σ.m : Real) * (k * (((ball G (r + (κ.d + σ.d)) v).ncard : Real)
     / (ball G r v).ncard - 1))) Filter.atTop (nhds (d * k)) := by
@@ -713,8 +713,8 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
       arg 3; rw [←add_zero (d * k : Real), ←mul_zero (N * σ.m : Real),
       ←mul_zero (k : Real), ←sub_self (1 : Real)]
     apply Filter.Tendsto.const_add; apply Filter.Tendsto.const_mul; apply Filter.Tendsto.const_mul
-    exact Filter.Tendsto.sub sc tendsto_const_nhds
-  -- conclude
+    apply Filter.Tendsto.sub _ tendsto_const_nhds
+    exact (slow_growth_at_ext' (κ.d + σ.d) 0 (slow_cover_at_iff.mp st))
   rw [cfudensity_at]
   refine le_of_le_of_eq (Filter.limsup_le_limsup ?_ ?_ ?_) he.limsup_eq
   · apply Filter.Eventually.of_forall; intro r
