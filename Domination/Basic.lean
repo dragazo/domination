@@ -654,31 +654,32 @@ noncomputable instance Scheme.support_fintype₂ [G.LocallyFinite]
 
 
 
-theorem cfudensity_at_cover_le''' [G.LocallyFinite]
+
+theorem cfudensity_at_cover_le'''' [G.LocallyFinite]
   (h₀ : 0 ≤ d)
   (h₁ : ∀ x, (κ.f x).ncard ≤ k)
-  (h₂ : ∀ t₁, {t₂ | σ.f t₁ t₂ ≠ 0}.ncard ≤ N)
+  (h₂ : ∀ t₁, ∑ᶠ t₂, |σ.f t₁ t₂| ≤ M)
   (h₃ : ∀ t, (∑ x ∈ {v | t ∈ κ.f v}.toFinset, μ.f x + ∑ᶠ t', σ.f t' t) / {v | t ∈ κ.f v}.ncard ≤ d)
   (st : slow_cover_at κ v := by assumption)
   : cfudensity_at κ μ v ≤ d * k := by
   classical
+  have hM : 0 ≤ M := le_trans (finsum_nonneg fun _ => abs_nonneg _) (h₂ (κ.f_nonempty v).some)
   have core (T E : Finset κ.t) (hTE : T ⊆ E)
       (hs : ∀ t ∈ T, Function.support (fun t' => σ.f t' t) ⊆ ↑E)
-      : -(∑ t ∈ T, ∑ᶠ t', σ.f t' t) ≤ N * σ.m * (E \ T).card := by
+      : -(∑ t ∈ T, ∑ᶠ t', σ.f t' t) ≤ M * (E \ T).card := by
     rw [Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset _ (hs t ht),
       Finset.sum_comm, ←Finset.sum_sdiff hTE, σ.sum_pairs_eq_zero, add_zero]
     refine le_trans (neg_le_abs _) (le_trans (Finset.abs_sum_le_sum_abs _ _) ?_)
-    refine le_trans (Finset.sum_le_sum (g := fun _ => (N : Real) * σ.m) fun t' _ => ?_)
+    refine le_trans (Finset.sum_le_sum (g := fun _ => M) fun t' _ => ?_)
       (le_of_eq (by rw [Finset.sum_const, nsmul_eq_mul']))
-    rw [←Finset.sum_filter_ne_zero]
-    apply le_trans (Finset.abs_sum_le_sum_abs _ _)
-    apply le_trans (Finset.sum_le_card_nsmul _ _ _ fun t _ => σ.f_max t' t)
-    rw [nsmul_eq_mul]; apply mul_le_mul_of_nonneg_right _ σ.m₀
-    norm_cast; rw [←Set.ncard_coe_finset]
-    refine le_trans (Set.ncard_le_ncard (t := {t₂ | σ.f t' t₂ ≠ 0}) ?_ (Set.toFinite _)) (h₂ t')
-    exact fun t ht => (Finset.mem_filter.1 (Finset.mem_coe.1 ht)).2
+    refine le_trans (Finset.abs_sum_le_sum_abs _ _) (le_trans ?_ (h₂ t'))
+    have hf : (Function.support fun t => |σ.f t' t|).Finite :=
+      (Set.toFinite {t₂ | σ.f t' t₂ ≠ 0}).subset fun t ht => abs_ne_zero.1 ht
+    rw [finsum_eq_sum_of_support_subset (s := T ∪ hf.toFinset) _
+      (by rw [Finset.coe_union, hf.coe_toFinset]; exact Set.subset_union_right)]
+    exact Finset.sum_le_sum_of_subset_of_nonneg Finset.subset_union_left fun _ _ _ => abs_nonneg _
   have P R : ∑ x ∈ κ.cball R v, μ.f x ≤ d * k * (κ.cball R v).ncard
-      + N * σ.m * (k * ((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Real)) := by
+      + M * (k * ((ball G (R + (κ.d + σ.d)) v \ ball G R v).ncard : Real)) := by
     unfold Cover.cball
     refine le_trans (κ.closure_sum_le_tile_sum (S := ball G R v) μ.f₀) ?_
     refine le_trans (Finset.sum_le_sum
@@ -700,17 +701,16 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
       obtain ⟨x, hx, htx⟩ := Set.mem_iUnion₂.1 (σ.support_subset₁ (hy := hty) h)
       rw [Finset.mem_coe, Set.mem_toFinset]
       refine Set.mem_iUnion₂.2 ⟨x, ?_, htx⟩
-      exact G.edist_triangle.trans ((add_le_add (show G.edist x y ≤ _ from hx)
-        (show G.edist y v ≤ _ from hy)).trans_eq (by push_cast; ring))
-    refine mul_le_mul_of_nonneg_left ?_ (mul_nonneg (Nat.cast_nonneg _) σ.m₀)
+      exact G.edist_triangle.trans ((add_le_add hx hy).trans_eq (by push_cast; ring))
+    refine mul_le_mul_of_nonneg_left ?_ hM
     norm_cast
     simp only [←Set.ncard_coe_finset, Finset.coe_sdiff, Set.coe_toFinset]
     exact le_trans (Set.ncard_le_ncard κ.tiles_diff_subset) (κ.tiles_ncard_le h₁)
   have he : Filter.Tendsto
-    (fun r => d * k + (N * σ.m : Real) * (k * (((ball G (r + (κ.d + σ.d)) v).ncard : Real)
+    (fun r => d * k + M * (k * (((ball G (r + (κ.d + σ.d)) v).ncard : Real)
     / (ball G r v).ncard - 1))) Filter.atTop (nhds (d * k)) := by
     conv =>
-      arg 3; rw [←add_zero (d * k : Real), ←mul_zero (N * σ.m : Real),
+      arg 3; rw [←add_zero (d * k : Real), ←mul_zero M,
       ←mul_zero (k : Real), ←sub_self (1 : Real)]
     apply Filter.Tendsto.const_add; apply Filter.Tendsto.const_mul; apply Filter.Tendsto.const_mul
     apply Filter.Tendsto.sub _ tendsto_const_nhds
@@ -721,8 +721,8 @@ theorem cfudensity_at_cover_le''' [G.LocallyFinite]
     rw [div_le_iff₀ (by ball!)]
     apply le_trans (P r)
     rw [add_mul]; apply add_le_add le_rfl
-    rw [mul_assoc (N * σ.m : Real)]
-    apply mul_le_mul_of_nonneg_left _ (mul_nonneg (Nat.cast_nonneg _) σ.m₀)
+    rw [mul_assoc M]
+    apply mul_le_mul_of_nonneg_left _ hM
     rw [mul_assoc]; apply mul_le_mul_of_nonneg_left _ (Nat.cast_nonneg _)
     rw [Set.ncard_diff (ball_mono (Nat.le_add_right _ _)),
       Nat.cast_sub (Set.ncard_le_ncard (ball_mono (Nat.le_add_right _ _))),
