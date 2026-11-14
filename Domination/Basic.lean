@@ -661,17 +661,15 @@ theorem Scheme.internal_sum_le [G.LocallyFinite] {T E : Set κ.t} (h₀ : E.Fini
   : |∑ᶠ t ∈ T, ∑ᶠ t', σ.f t' t| ≤ M * (E \ T).ncard := by
   classical
   have hT : T.Finite := h₀.subset h₁
-  have hTE : hT.toFinset ⊆ h₀.toFinset := Set.Finite.toFinset_subset_toFinset.2 h₁
-  have hc : (E \ T).ncard = (h₀.toFinset \ hT.toFinset).card := by simp [←Set.ncard_coe_finset]
-  rw [finsum_mem_eq_finite_toFinset_sum _ hT, hc,
+  rw [finsum_mem_eq_finite_toFinset_sum _ hT,
+    show (E \ T).ncard = (h₀.toFinset \ hT.toFinset).card by simp [←Set.ncard_coe_finset],
     Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset (s := h₀.toFinset) _
       (by rw [Set.Finite.coe_toFinset]; exact h₂ t (hT.mem_toFinset.1 ht)),
-    Finset.sum_comm, ←Finset.sum_sdiff hTE, σ.sum_pairs_eq_zero, add_zero]
-  refine le_trans (Finset.abs_sum_le_sum_abs _ _)
-    (le_trans (Finset.sum_le_sum (g := fun _ => M) fun t' _ => ?_)
-      (le_of_eq (by rw [Finset.sum_const, nsmul_eq_mul'])))
+    Finset.sum_comm, ←Finset.sum_sdiff ((Set.Finite.toFinset_subset_toFinset (hs := hT)).2 h₁),
+    σ.sum_pairs_eq_zero, add_zero, mul_comm, ←nsmul_eq_mul]
+  refine le_trans (Finset.abs_sum_le_sum_abs _ _) (Finset.sum_le_card_nsmul _ _ _ fun t' _ => ?_)
   refine le_trans (Finset.abs_sum_le_sum_abs _ _) (le_trans ?_ (h₃ t'))
-  have hf : (Function.support fun t => |σ.f t' t|).Finite :=
+  have hf : {t | |σ.f t' t| ≠ 0}.Finite :=
     (Set.toFinite {t₂ | σ.f t' t₂ ≠ 0}).subset fun t ht => abs_ne_zero.1 ht
   rw [finsum_eq_sum_of_support_subset (s := hT.toFinset ∪ hf.toFinset) _
     (by rw [Finset.coe_union, hf.coe_toFinset]; exact Set.subset_union_right)]
