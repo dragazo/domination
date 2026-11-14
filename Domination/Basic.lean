@@ -665,7 +665,7 @@ theorem cfudensity_at_cover_le'''' [G.LocallyFinite]
   classical
   have hM : 0 ≤ M := le_trans (finsum_nonneg fun _ => abs_nonneg _) (h₂ (κ.f_nonempty v).some)
   have core (T E : Finset κ.t) (hTE : T ⊆ E)
-      (hs : ∀ t ∈ T, Function.support (fun t' => σ.f t' t) ⊆ ↑E)
+      (hs : ∀ t ∈ T, {t' | σ.f t' t ≠ 0} ⊆ ↑E)
       : -(∑ t ∈ T, ∑ᶠ t', σ.f t' t) ≤ M * (E \ T).card := by
     rw [Finset.sum_congr rfl fun t ht => finsum_eq_sum_of_support_subset _ (hs t ht),
       Finset.sum_comm, ←Finset.sum_sdiff hTE, σ.sum_pairs_eq_zero, add_zero]
@@ -673,7 +673,7 @@ theorem cfudensity_at_cover_le'''' [G.LocallyFinite]
     refine le_trans (Finset.sum_le_sum (g := fun _ => M) fun t' _ => ?_)
       (le_of_eq (by rw [Finset.sum_const, nsmul_eq_mul']))
     refine le_trans (Finset.abs_sum_le_sum_abs _ _) (le_trans ?_ (h₂ t'))
-    have hf : (Function.support fun t => |σ.f t' t|).Finite :=
+    have hf : {t | |σ.f t' t| ≠ 0}.Finite :=
       (Set.toFinite {t₂ | σ.f t' t₂ ≠ 0}).subset fun t ht => abs_ne_zero.1 ht
     rw [finsum_eq_sum_of_support_subset (s := T ∪ hf.toFinset) _
       (by rw [Finset.coe_union, hf.coe_toFinset]; exact Set.subset_union_right)]
@@ -703,8 +703,7 @@ theorem cfudensity_at_cover_le'''' [G.LocallyFinite]
       refine Set.mem_iUnion₂.2 ⟨x, ?_, htx⟩
       exact G.edist_triangle.trans ((add_le_add hx hy).trans_eq (by push_cast; ring))
     refine mul_le_mul_of_nonneg_left ?_ hM
-    norm_cast
-    simp only [←Set.ncard_coe_finset, Finset.coe_sdiff, Set.coe_toFinset]
+    norm_cast; simp only [←Set.ncard_coe_finset, Finset.coe_sdiff, Set.coe_toFinset]
     exact le_trans (Set.ncard_le_ncard κ.tiles_diff_subset) (κ.tiles_ncard_le h₁)
   have he : Filter.Tendsto
     (fun r => d * k + M * (k * (((ball G (r + (κ.d + σ.d)) v).ncard : Real)
